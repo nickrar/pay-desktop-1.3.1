@@ -11,10 +11,6 @@ with built-in fallback rates available when there is no connection.
 > This is a personal project built for my own financial tracking workflow. It is
 > shared publicly as a portfolio and learning project.
 
-## Preview
-
-![Pay. dashboard](docs/dashboard.png)
-
 ## Demo
 
 The animated demo below cycles through the dashboard, savings, debt, expenses,
