@@ -15,6 +15,13 @@ with built-in fallback rates available when there is no connection.
 
 ![Pay. dashboard](docs/dashboard.png)
 
+## Demo
+
+The animated demo below cycles through the dashboard, savings, debt, expenses,
+income, and daily earning calendar screens:
+
+![Pay. feature demo](docs/pay-demo.gif)
+
 ## Features
 
 - Dashboard for cash balance, income, savings, debt, and expenses
