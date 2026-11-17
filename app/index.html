@@ -1,0 +1,3306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pay. — Personal Finance &amp; Daily Earning Tracker</title>
+
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob:; connect-src 'self' https://open.er-api.com;" />
+
+  <!-- Bundled styles (Tailwind, compiled locally) + local fonts: works fully offline -->
+  <link rel="stylesheet" href="./styles.css" />
+
+  <style>
+    :root {
+      --spring: cubic-bezier(0.32, 0.72, 0, 1);
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      font-family: "Plus Jakarta Sans", "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: #E4E7EF;
+      color: #18191D;
+      margin: 0;
+      padding: 0;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .sticky-header { background: rgba(246,247,251,0.88); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-radius: 20px; }
+    .goal-swipe { touch-action: pan-y; user-select: none; }
+    .goal-slide-l { animation: goalL 320ms var(--spring); }
+    .goal-slide-r { animation: goalR 320ms var(--spring); }
+    .money-note, .money-coin { position: fixed; z-index: 9999; pointer-events: none; will-change: transform; }
+    .money-note { width: 46px; height: 24px; border-radius: 4px; background: linear-gradient(135deg, #2E9460, #1F7A4C 55%, #17603B); border: 1.5px solid #6CC495; box-shadow: 0 3px 8px rgba(0,0,0,.22); display: flex; align-items: center; justify-content: center; }
+    .money-note::before { content: ''; position: absolute; inset: 3px; border: 1px dashed rgba(255,255,255,.35); border-radius: 2px; }
+    .money-note span { font: 800 10px "Plus Jakarta Sans", system-ui, sans-serif; color: #fff; letter-spacing: .02em; }
+    .money-coin { width: 20px; height: 20px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #FFF2B3, #F2C230 45%, #B8860B); border: 1.5px solid #D9A520; box-shadow: 0 2px 4px rgba(0,0,0,.25), inset 0 0 0 3px rgba(255,255,255,.18); }
+    .money-amount { position: fixed; left: 50%; top: 38%; z-index: 10000; pointer-events: none; padding: 10px 22px; border-radius: 999px; font: 800 26px "Plus Jakarta Sans", system-ui, sans-serif; font-variant-numeric: tabular-nums; box-shadow: 0 18px 40px rgba(24,25,29,.28); }
+    .money-amount-in { background: #18191D; color: #6EE7A8; }
+    .money-amount-out { background: #18191D; color: #FFFFFF; }
+    @keyframes goalL { from { transform: translateX(28px); opacity: .35; } to { transform: none; opacity: 1; } }
+    @keyframes goalR { from { transform: translateX(-28px); opacity: .35; } to { transform: none; opacity: 1; } }
+    .tabular-nums {
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Tactile spring micro-interactions */
+    .spring-btn {
+      transition:
+        transform 240ms var(--spring),
+        background-color 200ms ease,
+        border-color 200ms ease,
+        box-shadow 240ms var(--spring),
+        color 180ms ease;
+    }
+    .spring-btn:active {
+      transform: scale(0.965);
+    }
+
+    /* Left Vertical Icon Navigation Rail */
+    .rail-btn {
+      position: relative;
+      width: 44px;
+      height: 44px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #8D92A0;
+      transition: all 240ms var(--spring);
+    }
+    .rail-btn:hover {
+      color: #18191D;
+      background-color: #ECEEF4;
+    }
+    .rail-btn.active {
+      color: #18191D;
+      background-color: #FFFFFF;
+      box-shadow: 0 4px 14px rgba(24, 25, 29, 0.07);
+    }
+    .rail-btn.active::before {
+      content: "";
+      position: absolute;
+      left: -14px;
+      top: 11px;
+      bottom: 11px;
+      width: 3.5px;
+      border-radius: 0 4px 4px 0;
+      background-color: #18191D;
+    }
+
+    /* Hero Debit-Style Balance Card Sheen */
+    .hero-black-card {
+      background: linear-gradient(135deg, #23252B 0%, #18191D 52%, #111215 100%);
+      position: relative;
+      overflow: hidden;
+    }
+    .hero-black-card::after {
+      content: "";
+      position: absolute;
+      top: -35%;
+      right: -18%;
+      width: 72%;
+      height: 155%;
+      background: radial-gradient(circle at center, rgba(255, 255, 255, 0.085) 0%, rgba(255, 255, 255, 0.02) 48%, transparent 72%);
+      border-radius: 50%;
+      pointer-events: none;
+    }
+
+    /* View fade-in animation */
+    .view-section {
+      animation: sectionEnter 260ms var(--spring);
+    }
+    @keyframes sectionEnter {
+      from {
+        opacity: 0;
+        transform: translateY(6px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    /* Badge pop animation when cycling status */
+    @keyframes popScale {
+      0% { transform: scale(0.88); }
+      55% { transform: scale(1.07); }
+      100% { transform: scale(1); }
+    }
+    .animate-pop {
+      animation: popScale 280ms var(--spring);
+    }
+
+    /* Modal backdrop */
+    .modal-backdrop {
+      background: rgba(24, 25, 29, 0.34);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+
+    /* Clean subtle scrollbars */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(24, 25, 29, 0.14);
+      border-radius: 999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(24, 25, 29, 0.25);
+    }
+
+    /* Hide number input spinners */
+    input[type="number"]::-webkit-inner-spin-button,
+    input[type="number"]::-webkit-outer-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+    input[type="number"] {
+      -moz-appearance: textfield;
+    }
+  </style>
+</head>
+<body class="min-h-screen p-2 sm:p-5 lg:p-6 flex items-start justify-center">
+
+  <!-- Outer Rounded App Shell (#F6F7FB) -->
+  <div class="w-full max-w-[1680px] min-h-[92vh] bg-shell rounded-[28px] sm:rounded-[34px] shadow-shell border border-white/80 flex flex-col lg:flex-row p-3 sm:p-5 gap-3 sm:gap-5 relative">
+
+    <!-- =================================================================== -->
+    <!-- LEFT SLIM VERTICAL ICON NAVIGATION RAIL (Desktop >= 1024px)         -->
+    <!-- =================================================================== -->
+    <aside class="hidden lg:flex flex-col items-center justify-between w-[72px] py-3 shrink-0 select-none lg:sticky lg:top-6 lg:self-start lg:h-[calc(100vh-5.5rem)]">
+      <div class="flex flex-col items-center gap-8">
+        <!-- Extra-Black Geometric "Pay" Logo -->
+        <button
+          type="button"
+          onclick="switchView('overview')"
+          title="Pay. — Overview"
+          class="spring-btn text-[24px] font-extrabold tracking-tighter text-obsidian leading-none pt-1 pb-2"
+        >
+          Pay<span class="text-[#1F7A4C]">.</span>
+        </button>
+
+        <!-- 6 Navigation Rail Icons -->
+        <nav class="flex flex-col items-center gap-3.5" aria-label="Primary Navigation">
+          <!-- 1. Overview (Home) -->
+          <button type="button" data-rail="overview" onclick="switchView('overview')" title="Overview Dashboard" class="rail-btn active">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M11.47 3.84a.75.75 0 011.06 0l8.69 8.69a.75.75 0 101.06-1.06l-8.689-8.69a2.25 2.25 0 00-3.182 0l-8.69 8.69a.75.75 0 001.061 1.06l8.69-8.69z"/>
+              <path d="M12 5.432l8.159 8.159c.03.03.06.058.091.086v6.198c0 1.035-.84 1.875-1.875 1.875H15a.75.75 0 01-.75-.75v-4.5a.75.75 0 00-.75-.75h-3a.75.75 0 00-.75.75V21a.75.75 0 01-.75.75H5.625a1.875 1.875 0 01-1.875-1.875v-6.198a2.29 2.29 0 00.091-.086L12 5.43z"/>
+            </svg>
+          </button>
+
+          <!-- 2. Savings -->
+          <button type="button" data-rail="savings" onclick="switchView('savings')" title="Savings &amp; Assets" class="rail-btn">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <ellipse cx="12" cy="5.5" rx="8" ry="3"/><path d="M4 5.5v6.5c0 1.66 3.58 3 8 3s8-1.34 8-3V5.5"/><path d="M4 12v6.5c0 1.66 3.58 3 8 3s8-1.34 8-3V12"/>
+            </svg>
+          </button>
+
+          <!-- 3. Debt -->
+          <button type="button" data-rail="debt" onclick="switchView('debt')" title="Debt &amp; Liabilities" class="rail-btn">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M5 2v20l2.33-1.5L9.67 22 12 20.5 14.33 22l2.34-1.5L19 22V2l-2.33 1.5L14.33 2 12 3.5 9.67 2 7.33 3.5z"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/>
+            </svg>
+          </button>
+
+          <!-- 4. Expenses -->
+          <button type="button" data-rail="expenses" onclick="switchView('expenses')" title="Expenses Tracker" class="rail-btn">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="2" y="5" width="20" height="14" rx="3"/>
+              <line x1="2" y1="10" x2="22" y2="10"/>
+            </svg>
+          </button>
+
+          <!-- 5. Income -->
+          <button type="button" data-rail="income" onclick="switchView('income')" title="Income & Daily Earnings" class="rail-btn">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
+              <polyline points="17 6 23 6 23 12"/>
+            </svg>
+          </button>
+
+          <!-- 6. Daily Calendar -->
+          <button type="button" data-rail="calendar" onclick="switchView('calendar')" title="Monthly Daily Earning Calendar" class="rail-btn">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="4" width="18" height="18" rx="3"/>
+              <line x1="16" y1="2" x2="16" y2="6"/>
+              <line x1="8" y1="2" x2="8" y2="6"/>
+              <line x1="3" y1="10" x2="21" y2="10"/>
+            </svg>
+          </button>
+        </nav>
+      </div>
+
+      <!-- Bottom Quick Export Icon -->
+      <button type="button" onclick="exportBackupJSON()" title="Export JSON Backup" class="rail-btn">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="7 10 12 15 17 10"/>
+          <line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+      </button>
+    </aside>
+
+    <!-- =================================================================== -->
+    <!-- RIGHT MAIN COLUMN (Top Header Bar + Pure White Elevated Workspace)  -->
+    <!-- =================================================================== -->
+    <div class="flex-1 flex flex-col min-w-0 gap-3 sm:gap-4">
+
+      <!-- TOP HEADER BAR -->
+      <header class="sticky-header relative lg:sticky top-0 z-50 flex flex-wrap items-center justify-between gap-3 px-1 sm:px-2 py-2 -mt-1">
+        <!-- Left: Mobile Logo + Clean White Pill Search Input -->
+        <div class="flex items-center gap-3 flex-1 min-w-[210px] max-w-md">
+          <button
+            type="button"
+            onclick="switchView('overview')"
+            class="lg:hidden text-[22px] font-extrabold tracking-tighter text-obsidian leading-none shrink-0"
+          >
+            Pay<span class="text-[#1F7A4C]">.</span>
+          </button>
+
+          <div class="relative flex-1">
+            <svg class="w-4 h-4 text-[#9CA1AE] absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            <input
+              id="globalSearchInput"
+              type="text"
+              oninput="handleGlobalSearch(this.value)"
+              placeholder="Search"
+              aria-label="Search transactions and entries"
+              class="w-full bg-white hover:bg-white/95 focus:bg-white text-[13.5px] font-medium text-obsidian placeholder-[#9CA1AE] rounded-full pl-10 pr-8 py-2.5 shadow-pill outline-none border border-transparent focus:border-obsidian/15 transition"
+            />
+            <button
+              type="button"
+              id="clearGlobalSearchBtn"
+              onclick="clearGlobalSearch()"
+              class="hidden absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted hover:text-obsidian"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+
+        <!-- Right: Month & Year Switcher (< Nov 2026 >) + Currency + "+ Add" + Settings + Avatar -->
+        <div class="flex flex-wrap items-center gap-2 sm:gap-2.5 ml-auto">
+          <!-- Interactive Month & Year Switcher -->
+          <div class="inline-flex items-center bg-white rounded-full p-1 shadow-pill border border-black/[0.04]">
+            <button
+              type="button"
+              onclick="shiftActiveMonth(-1)"
+              title="Previous Month"
+              aria-label="Previous Month"
+              class="spring-btn w-7 h-7 rounded-full hover:bg-shell flex items-center justify-center text-obsidian"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="15 18 9 12 15 6"/>
+              </svg>
+            </button>
+            <span id="headerMonthLabel" class="px-2.5 text-[13px] font-bold text-obsidian tabular-nums select-none min-w-[84px] text-center">
+              Nov 2026
+            </span>
+            <button
+              type="button"
+              onclick="shiftActiveMonth(1)"
+              title="Next Month"
+              aria-label="Next Month"
+              class="spring-btn w-7 h-7 rounded-full hover:bg-shell flex items-center justify-center text-obsidian"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="9 18 15 12 9 6"/>
+              </svg>
+            </button>
+          </div>
+
+          <!-- Jump to Today (Nov 2026) Pill when browsing another month -->
+          <button
+            type="button"
+            id="jumpTodayBtn"
+            onclick="jumpToTodayMonth()"
+            class="hidden spring-btn bg-white hover:bg-obsidian hover:text-white text-obsidian text-[12px] font-bold rounded-full px-3 py-2 shadow-pill border border-black/[0.05]"
+          >
+            Today
+          </button>
+
+          <!-- Currency Selector Pill -->
+          <div class="relative">
+            <select
+              id="currencySelect"
+              onchange="changeCurrency(this.value)"
+              aria-label="Select Currency"
+              class="spring-btn appearance-none bg-white text-obsidian text-[12.5px] font-bold rounded-full pl-3.5 pr-7 py-2 shadow-pill border border-black/[0.04] cursor-pointer outline-none"
+            >
+              <option value="MYR">MYR RM</option>
+              <option value="USD">USD $</option>
+              <option value="EUR">EUR €</option>
+              <option value="GBP">GBP £</option>
+              <option value="SGD">SGD S$</option>
+            </select>
+            <svg class="w-3 h-3 text-muted absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </div>
+
+          <!-- Quick "+ Add" Dark Pill Button -->
+          <button
+            type="button"
+            onclick="openEntryModal()"
+            class="spring-btn bg-obsidian hover:bg-[#2A2C33] text-white text-[12.5px] font-bold rounded-full px-4 py-2 shadow-pill flex items-center gap-1.5"
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round">
+              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+            <span>Add</span>
+          </button>
+
+          <!-- Settings / Data Menu Dropdown -->
+          <div class="relative z-50" id="settingsDropdownWrap">
+            <button
+              type="button"
+              onclick="toggleNotifMenu()"
+              title="Notifications"
+              aria-label="Data and Settings"
+              class="spring-btn w-9 h-9 rounded-full bg-white flex items-center justify-center text-obsidian shadow-pill border border-black/[0.04] relative"
+            >
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+              </svg>
+              <span id="notifDot" class="hidden w-2 h-2 rounded-full bg-rose-500 absolute top-2 right-2"></span>
+            </button>
+
+            <div id="notifMenu" class="hidden absolute left-0 sm:left-auto sm:right-0 max-w-[calc(100vw-2rem)] mt-2.5 w-80 bg-white rounded-[22px] border border-black/[0.06] shadow-xl py-2 z-50">
+              <div class="px-4 py-2 border-b border-shell flex items-center justify-between">
+                <div class="text-[11px] font-bold uppercase tracking-wider text-muted">Notifications</div>
+              </div>
+              <div id="notifList" class="max-h-96 overflow-y-auto"></div>
+            </div>
+          </div>
+
+          <!-- Circular User Profile Avatar + Menu -->
+          <div class="relative z-50" id="profileDropdownWrap">
+          <button
+            type="button"
+            onclick="toggleSettingsMenu()"
+            title="Profile & Settings"
+            class="spring-btn w-9 h-9 rounded-full bg-obsidian text-white flex items-center justify-center text-[13px] font-extrabold shadow-pill shrink-0"
+          >
+            <span id="userAvatarInitials">A</span>
+          </button>
+          <div id="settingsDropdownMenu" class="hidden absolute left-0 sm:left-auto sm:right-0 max-w-[calc(100vw-2rem)] mt-2.5 w-60 bg-white rounded-[22px] border border-black/[0.06] shadow-xl py-2 z-50">
+              <div class="px-4 py-2 border-b border-shell">
+                <div class="text-[11px] font-bold uppercase tracking-wider text-muted">Pay. Workspace</div>
+                <div class="text-[12px] text-obsidian/70 mt-0.5">Auto-saved in browser</div>
+              </div>
+              <button type="button" onclick="openProfileGoalModal(); toggleSettingsMenu();" class="w-full text-left px-4 py-2.5 text-[13px] font-semibold text-obsidian hover:bg-shell flex items-center gap-2.5">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-muted"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg> Edit Profile, Goal &amp; Opening Cash
+              </button>
+              <button type="button" onclick="loadSampleDataset(); toggleSettingsMenu();" class="w-full text-left px-4 py-2.5 text-[13px] font-semibold text-obsidian hover:bg-shell flex items-center gap-2.5">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-muted"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5L18 18M6 18l2.5-2.5M15.5 8.5L18 6"/></svg> Load Sample Data
+              </button>
+              <button type="button" onclick="exportBackupJSON(); toggleSettingsMenu();" class="w-full text-left px-4 py-2.5 text-[13px] font-semibold text-obsidian hover:bg-shell flex items-center gap-2.5">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-muted"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Export JSON Backup
+              </button>
+              <button type="button" onclick="triggerImportBackup(); toggleSettingsMenu();" class="w-full text-left px-4 py-2.5 text-[13px] font-semibold text-obsidian hover:bg-shell flex items-center gap-2.5">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-muted"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> Import JSON Backup
+              </button>
+              <button type="button" id="downloadSafetyBackupBtn" onclick="downloadSafetyBackup(); toggleSettingsMenu();" class="hidden w-full text-left px-4 py-2.5 text-[13px] font-semibold text-obsidian hover:bg-shell flex items-center gap-2.5">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-muted"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> Download Safety Backup
+              </button>
+              <button type="button" onclick="toggleSoundEffects()" class="w-full text-left px-4 py-2.5 text-[13px] font-semibold text-obsidian hover:bg-shell flex items-center gap-2.5">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-muted"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a10 10 0 0 1 0 14"/></svg> <span id="soundToggleLabel">Money Sounds: On</span>
+              </button>
+              <input type="file" id="importBackupInput" accept="application/json,.json" class="hidden" onchange="handleImportBackupFile(this)" />
+              <div class="my-1 border-t border-shell"></div>
+              <div id="clearZeroMenuDefault">
+                <button type="button" onclick="toggleInlineClearConfirm(true)" class="w-full text-left px-4 py-2.5 text-[13px] font-bold text-rose-600 hover:bg-rose-50/70 flex items-center gap-2.5">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg> Clear All to Zero
+                </button>
+              </div>
+              <div id="clearZeroMenuConfirm" class="hidden px-4 py-2.5 bg-rose-50/80">
+                <p class="text-[12px] font-semibold text-rose-800 mb-2">Erase all entries to zero?</p>
+                <div class="flex items-center gap-2">
+                  <button type="button" onclick="executeClearAllToZero(); toggleSettingsMenu();" class="flex-1 bg-rose-600 text-white text-[12px] font-bold py-1.5 rounded-xl">Confirm</button>
+                  <button type="button" onclick="toggleInlineClearConfirm(false)" class="flex-1 bg-white text-obsidian text-[12px] font-semibold py-1.5 rounded-xl border border-black/10">Cancel</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          </div>
+      </header>
+
+      <!-- Mobile/Tablet Compact 6-Tab Navigation Strip -->
+      <nav class="lg:hidden sticky top-0 z-40 bg-shell/95 rounded-2xl backdrop-blur flex items-center gap-1.5 overflow-x-auto px-1 py-1.5" aria-label="Mobile Navigation">
+        <button type="button" data-mob-tab="overview" onclick="switchView('overview')" class="mob-nav-pill px-4 py-2 rounded-full text-[14px] font-bold bg-obsidian text-white shrink-0">Overview</button>
+        <button type="button" data-mob-tab="savings" onclick="switchView('savings')" class="mob-nav-pill px-4 py-2 rounded-full text-[14px] font-semibold bg-white text-muted shrink-0">Savings</button>
+        <button type="button" data-mob-tab="debt" onclick="switchView('debt')" class="mob-nav-pill px-4 py-2 rounded-full text-[14px] font-semibold bg-white text-muted shrink-0">Debt</button>
+        <button type="button" data-mob-tab="expenses" onclick="switchView('expenses')" class="mob-nav-pill px-4 py-2 rounded-full text-[14px] font-semibold bg-white text-muted shrink-0">Expenses</button>
+        <button type="button" data-mob-tab="income" onclick="switchView('income')" class="mob-nav-pill px-4 py-2 rounded-full text-[14px] font-semibold bg-white text-muted shrink-0">Income</button>
+        <button type="button" data-mob-tab="calendar" onclick="switchView('calendar')" class="mob-nav-pill px-4 py-2 rounded-full text-[14px] font-semibold bg-white text-muted shrink-0">Daily Calendar</button>
+      </nav>
+
+      <!-- ================================================================= -->
+      <!-- ELEVATED PURE WHITE INNER WORKSPACE CONTAINER (#FFFFFF)           -->
+      <!-- ================================================================= -->
+      <main class="flex-1 bg-white rounded-[26px] sm:rounded-[28px] p-5 sm:p-7 lg:p-8 shadow-workspace border border-black/[0.03]">
+
+        <!-- =============================================================== -->
+        <!-- VIEW 1: OVERVIEW DASHBOARD (TWO-COLUMN LAYOUT)                  -->
+        <!-- =============================================================== -->
+        <section id="view-overview" class="view-section grid grid-cols-1 xl:grid-cols-[minmax(0,1.72fr)_minmax(330px,1fr)] gap-7 items-start">
+
+          <!-- LEFT / CENTER MAIN AREA (~64%) -->
+          <div class="flex flex-col gap-7 min-w-0">
+
+            <!-- TOP ROW: Hero Black Card + 4 Quick Category Summary Cards -->
+            <div class="grid grid-cols-1 lg:grid-cols-[minmax(285px,1.05fr)_minmax(0,1.15fr)] gap-5 items-stretch">
+
+              <!-- Left: Dashboard Title + Hero Black Card (#18191D) -->
+              <div class="flex flex-col">
+                <div class="flex items-center justify-between mb-3.5">
+                  <h2 class="text-[21px] font-extrabold tracking-tight text-obsidian">Dashboard</h2>
+                  <button
+                    type="button"
+                    onclick="toggleHeroCardMetric()"
+                    class="text-[11.5px] font-bold text-muted hover:text-obsidian transition"
+                  >
+                    Switch metric ⇄
+                  </button>
+                </div>
+
+                <div
+                  onclick="togglePrivacyMask()"
+                  title="Click card to toggle privacy mask"
+                  class="spring-btn cursor-pointer hero-black-card rounded-[24px] p-6 text-white flex flex-col justify-between min-h-[192px] shadow-card select-none"
+                >
+                  <!-- Top: Gold EMV Chip + Contactless Waves + Metric Tag -->
+                  <div class="flex items-center justify-between relative z-10">
+                    <div class="flex items-center gap-3">
+                      <!-- Gold EMV Chip SVG -->
+                      <svg width="36" height="26" viewBox="0 0 36 26" fill="none">
+                        <rect width="36" height="26" rx="5" fill="url(#emvGold)"/>
+                        <path d="M12 0V26M24 0V26M0 9H12M24 9H36M0 17H12M24 17H36" stroke="#8C6D23" stroke-width="1" stroke-opacity="0.55"/>
+                        <defs>
+                          <linearGradient id="emvGold" x1="0" y1="0" x2="36" y2="26" gradientUnits="userSpaceOnUse">
+                            <stop stop-color="#F6DC92"/>
+                            <stop offset="0.55" stop-color="#DFB95B"/>
+                            <stop offset="1" stop-color="#B98E34"/>
+                          </linearGradient>
+                        </defs>
+                      </svg>
+                      <!-- Contactless Waves -->
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" class="text-white/80">
+                        <path d="M8.5 14.5a5 5 0 0 1 0-5"/>
+                        <path d="M11.5 17a8.5 8.5 0 0 1 0-10"/>
+                        <path d="M14.5 19.5a12 12 0 0 1 0-15"/>
+                      </svg>
+                    </div>
+
+                    <span class="text-[11px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-white/10 text-white/80" id="heroCardModeTag">
+                      Cash Balance
+                    </span>
+                  </div>
+
+                  <!-- Center: Masked Digits + Hero Balance -->
+                  <div class="my-3 relative z-10">
+                    <div class="text-[12px] font-medium tracking-[0.2em] text-white/60 tabular-nums mb-1">
+                      4562 1122 4595 2026
+                    </div>
+                    <div id="heroBalanceValue" class="text-[27px] sm:text-[29px] font-extrabold tracking-tight tabular-nums leading-tight">
+                      $25,999.00
+                    </div>
+                  </div>
+
+                  <!-- Bottom: Cardholder Name + Overlapping Red/Amber Circles Emblem -->
+                  <div class="flex items-end justify-between relative z-10">
+                    <div>
+                      <span class="text-[9.5px] uppercase tracking-widest text-white/45 block">Card Holder</span>
+                      <span id="heroCardHolderName" class="text-[13px] font-bold text-white/95">Alex</span>
+                    </div>
+
+                    <div class="flex items-center">
+                      <span class="w-6 h-6 rounded-full bg-[#EB001B] inline-block opacity-95"></span>
+                      <span class="w-6 h-6 rounded-full bg-[#F79E1B] -ml-2.5 inline-block opacity-90"></span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Right: Category Summary Cards (Income, Savings, Debt, Expenses) -->
+              <div class="flex flex-col">
+                <div class="flex items-center justify-between mb-3.5">
+                  <h2 class="text-[21px] font-extrabold tracking-tight text-obsidian">Accounts &amp; Flow</h2>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3 flex-1">
+                  <!-- Income Card -->
+                  <button
+                    type="button"
+                    onclick="switchView('income')"
+                    class="spring-btn bg-shell hover:bg-[#ECEEF5] rounded-[22px] p-4 flex flex-col items-center justify-center text-center gap-2 border border-black/[0.03]"
+                  >
+                    <div class="w-11 h-11 rounded-2xl bg-obsidian text-white flex items-center justify-center shadow-sm">
+                      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/>
+                      </svg>
+                    </div>
+                    <div>
+                      <div class="text-[15.5px] font-extrabold text-obsidian leading-tight">Income</div>
+                      <div id="cardIncomeSub" class="text-[11px] font-medium text-muted mt-0.5">Streams + Daily</div>
+                    </div>
+                    <div id="cardIncomeTotal" class="text-[15px] font-extrabold text-[#1F7A4C] tabular-nums">+$0.00</div>
+                  </button>
+
+                  <!-- Savings Card -->
+                  <button
+                    type="button"
+                    onclick="switchView('savings')"
+                    class="spring-btn bg-shell hover:bg-[#ECEEF5] rounded-[22px] p-4 flex flex-col items-center justify-center text-center gap-2 border border-black/[0.03]"
+                  >
+                    <div class="w-11 h-11 rounded-2xl bg-obsidian text-white flex items-center justify-center shadow-sm">
+                      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <ellipse cx="12" cy="5.5" rx="8" ry="3"/><path d="M4 5.5v6.5c0 1.66 3.58 3 8 3s8-1.34 8-3V5.5"/><path d="M4 12v6.5c0 1.66 3.58 3 8 3s8-1.34 8-3V12"/>
+                      </svg>
+                    </div>
+                    <div>
+                      <div class="text-[15.5px] font-extrabold text-obsidian leading-tight">Savings</div>
+                      <div id="cardSavingsSub" class="text-[11px] font-medium text-muted mt-0.5">0 active vaults</div>
+                    </div>
+                    <div id="cardSavingsTotal" class="text-[15px] font-extrabold text-obsidian tabular-nums">$0.00</div>
+                  </button>
+
+                  <!-- Debt Card -->
+                  <button
+                    type="button"
+                    onclick="switchView('debt')"
+                    class="spring-btn bg-shell hover:bg-[#ECEEF5] rounded-[22px] p-4 flex flex-col items-center justify-center text-center gap-2 border border-black/[0.03]"
+                  >
+                    <div class="w-11 h-11 rounded-2xl bg-obsidian text-white flex items-center justify-center shadow-sm">
+                      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M5 2v20l2.33-1.5L9.67 22 12 20.5 14.33 22l2.34-1.5L19 22V2l-2.33 1.5L14.33 2 12 3.5 9.67 2 7.33 3.5z"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/>
+                      </svg>
+                    </div>
+                    <div>
+                      <div class="text-[15.5px] font-extrabold text-obsidian leading-tight">Debt</div>
+                      <div id="cardDebtSub" class="text-[11px] font-medium text-muted mt-0.5">0 liabilities</div>
+                    </div>
+                    <div id="cardDebtTotal" class="text-[15px] font-extrabold text-obsidian tabular-nums">$0.00</div>
+                  </button>
+
+                  <!-- Expenses Card -->
+                  <button
+                    type="button"
+                    onclick="switchView('expenses')"
+                    class="spring-btn bg-shell hover:bg-[#ECEEF5] rounded-[22px] p-4 flex flex-col items-center justify-center text-center gap-2 border border-black/[0.03]"
+                  >
+                    <div class="w-11 h-11 rounded-2xl bg-obsidian text-white flex items-center justify-center shadow-sm">
+                      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="2" y="5" width="20" height="14" rx="3"/><line x1="2" y1="10" x2="22" y2="10"/>
+                      </svg>
+                    </div>
+                    <div>
+                      <div class="text-[15.5px] font-extrabold text-obsidian leading-tight">Expenses</div>
+                      <div id="cardExpensesSub" class="text-[11px] font-medium text-muted mt-0.5">0 monthly items</div>
+                    </div>
+                    <div id="cardExpensesTotal" class="text-[15px] font-extrabold text-obsidian tabular-nums">$0.00</div>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Opening Cash + the two headline numbers not currently on the black card (no duplicates) -->
+            <div id="cashSummaryStrip" class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 -mt-2"></div>
+
+            <!-- =========================================================== -->
+            <!-- INTERACTIVE MONTHLY DAILY EARNING CALENDAR WIDGET           -->
+            <!-- =========================================================== -->
+            <div class="bg-shell rounded-[24px] p-5 sm:p-6 border border-black/[0.03]">
+              <!-- Calendar Header -->
+              <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+                <div class="flex items-center gap-2.5">
+                  <h3 id="overviewCalendarHeading" class="text-[16.5px] font-extrabold text-obsidian tracking-tight">
+                    Daily Earning Calendar
+                  </h3>
+                  <span id="overviewCalendarMonthBadge" class="bg-white border border-black/[0.05] rounded-full px-2.5 py-0.5 text-[12px] font-bold text-obsidian tabular-nums">November 2026</span>
+                  <div class="inline-flex items-center gap-1 bg-white rounded-full p-0.5 border border-black/[0.05]">
+                    <button type="button" onclick="shiftActiveMonth(-1)" aria-label="Previous Month" class="w-6 h-6 rounded-full hover:bg-shell flex items-center justify-center text-obsidian text-xs">‹</button>
+                    <button type="button" onclick="shiftActiveMonth(1)" aria-label="Next Month" class="w-6 h-6 rounded-full hover:bg-shell flex items-center justify-center text-obsidian text-xs">›</button>
+                  </div>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-2">
+                  <span id="calendarMonthTotalPill" class="px-3 py-1 rounded-full bg-mint-bg text-mint-text text-[12px] font-bold tabular-nums">
+                    Month Daily: +$0.00
+                  </span>
+                  <span id="calendarWeekTotalPill" class="px-3 py-1 rounded-full bg-white text-[#1F7A4C] text-[12px] font-bold tabular-nums border border-black/[0.05]">
+                    Week: +$0.00
+                  </span>
+                  <span id="calendarActiveDaysPill" class="px-3 py-1 rounded-full bg-white text-obsidian text-[12px] font-bold tabular-nums border border-black/[0.05]">
+                    0 Earning Days
+                  </span>
+                </div>
+              </div>
+
+              <!-- 7-Column Weekday Header (Mon - Sun) -->
+              <div class="grid grid-cols-7 gap-1.5 text-center text-[11px] font-bold uppercase tracking-wider text-muted mb-1.5">
+                <div>Mon</div>
+                <div>Tue</div>
+                <div>Wed</div>
+                <div>Thu</div>
+                <div>Fri</div>
+                <div>Sat</div>
+                <div>Sun</div>
+              </div>
+
+              <!-- 7-Column Monthly Calendar Grid -->
+              <div id="overviewCalendarGrid" class="grid grid-cols-7 gap-1.5"></div>
+
+              <!-- Inline Quick Record Daily Earning Bar for Selected Day -->
+              <div class="mt-4 pt-4 border-t border-black/[0.06] flex flex-col gap-3">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                  <div class="flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-[#1F7A4C]"></span>
+                    <span id="selectedDayBannerLabel" class="text-[13px] font-bold text-obsidian tabular-nums">
+                      Selected: Mon, Nov 16, 2026
+                    </span>
+                    <span id="selectedDayTotalBadge" class="text-[11.5px] font-bold px-2.5 py-0.5 rounded-full bg-white text-[#1F7A4C] border border-black/[0.05] tabular-nums">
+                      +$0.00
+                    </span>
+                  </div>
+
+                  <!-- Quick-Tap Preset Pills (+20, +50, +100) -->
+                  <div class="flex items-center gap-1.5">
+                    <button type="button" onclick="bumpDailyEarningInput(20, 'overview')" class="spring-btn bg-white hover:bg-obsidian hover:text-white text-obsidian text-[11.5px] font-bold px-2.5 py-1 rounded-full border border-black/[0.05] tabular-nums">+<span class="quick-sym">$</span>20</button>
+                    <button type="button" onclick="bumpDailyEarningInput(50, 'overview')" class="spring-btn bg-white hover:bg-obsidian hover:text-white text-obsidian text-[11.5px] font-bold px-2.5 py-1 rounded-full border border-black/[0.05] tabular-nums">+<span class="quick-sym">$</span>50</button>
+                    <button type="button" onclick="bumpDailyEarningInput(100, 'overview')" class="spring-btn bg-white hover:bg-obsidian hover:text-white text-obsidian text-[11.5px] font-bold px-2.5 py-1 rounded-full border border-black/[0.05] tabular-nums">+<span class="quick-sym">$</span>100</button>
+                  </div>
+                </div>
+
+                <form onsubmit="handleRecordDailyEarning(event, 'overview')" class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                  <div class="relative sm:w-36 shrink-0">
+                    <span class="currency-prefix-sym absolute left-3.5 top-1/2 -translate-y-1/2 text-[13px] font-bold text-muted pointer-events-none">$</span>
+                    <input
+                      id="overviewDailyAmount"
+                      type="number"
+                      min="0.01"
+                      step="any"
+                      required
+                      placeholder="0.00"
+                      aria-label="Daily earning amount"
+                      class="w-full bg-white border border-black/[0.08] focus:border-obsidian rounded-2xl pl-9 pr-3 py-2 text-[14px] font-bold text-obsidian tabular-nums outline-none"
+                    />
+                  </div>
+
+                  <input
+                    id="overviewDailyNote"
+                    type="text"
+                    maxlength="60"
+                    placeholder="Source or note (e.g., Client Milestone, Daily Sales)"
+                    aria-label="Daily earning note"
+                    class="flex-1 bg-white border border-black/[0.08] focus:border-obsidian rounded-2xl px-3.5 py-2 text-[13px] font-medium text-obsidian placeholder-muted outline-none"
+                  />
+
+                  <select id="overviewDailyStatus" aria-label="Earning status" class="sm:w-32 shrink-0 bg-white border border-black/[0.08] focus:border-obsidian rounded-2xl px-3 py-2 text-[13px] font-bold text-obsidian outline-none cursor-pointer">
+                    <option value="Received">Received</option>
+                    <option value="Pending">Pending</option>
+                  </select>
+
+                  <button
+                    type="submit"
+                    class="spring-btn bg-obsidian hover:bg-[#2A2C33] text-white text-[13px] font-bold rounded-2xl px-5 py-2 shrink-0"
+                  >
+                    Record
+                  </button>
+                </form>
+
+                <!-- Individual Daily Earning Entries for the Selected Day -->
+                <div id="overviewSelectedDayEntries" class="flex flex-col gap-1.5"></div>
+              </div>
+            </div>
+
+            <!-- =========================================================== -->
+            <!-- RECENT TRANSACTION SECTION                                  -->
+            <!-- =========================================================== -->
+            <div>
+              <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+                <div class="flex flex-wrap items-center gap-2">
+                  <h3 class="text-[18px] font-extrabold text-obsidian tracking-tight mr-1">Monthly Cash Flow</h3>
+
+                  <!-- Status Filter Pills -->
+                  <div class="inline-flex items-center gap-1">
+                    <button type="button" data-tx-status="all" onclick="setOverviewTxStatusFilter('all')" class="tx-status-pill px-3 py-1 rounded-full text-[11.5px] font-bold bg-obsidian text-white transition">All</button>
+                    <button type="button" data-tx-status="pending" onclick="setOverviewTxStatusFilter('pending')" class="tx-status-pill px-3 py-1 rounded-full text-[11.5px] font-semibold bg-shell text-muted hover:text-obsidian transition">Pending</button>
+                    <button type="button" data-tx-status="completed" onclick="setOverviewTxStatusFilter('completed')" class="tx-status-pill px-3 py-1 rounded-full text-[11.5px] font-semibold bg-shell text-muted hover:text-obsidian transition">Completed</button>
+                  </div>
+                  <button type="button" id="recurringRulesBtn" onclick="toggleRecurringRules()" class="spring-btn px-3 py-1 rounded-full text-[11.5px] font-bold bg-skypill-bg text-skypill-text transition">Recurring rules</button>
+                </div>
+
+                <!-- Right: Sort by Dropdown + A↓Z Toggle Button -->
+                <div class="flex items-center gap-2">
+                  <div class="relative">
+                    <select
+                      id="overviewSortSelect"
+                      onchange="changeOverviewSort(this.value)"
+                      aria-label="Sort transactions"
+                      class="appearance-none bg-shell hover:bg-[#ECEEF5] text-obsidian text-[12px] font-semibold rounded-full pl-3.5 pr-7 py-1.5 cursor-pointer outline-none transition"
+                    >
+                      <option value="newest">Sort by: Newest</option>
+                      <option value="amount_desc">Amount: High to Low</option>
+                      <option value="amount_asc">Amount: Low to High</option>
+                      <option value="name">Name</option>
+                    </select>
+                    <svg class="w-3 h-3 text-muted absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                      <polyline points="6 9 12 15 18 9"/>
+                    </svg>
+                  </div>
+
+                  <button
+                    type="button"
+                    onclick="toggleAlphaSort()"
+                    title="Toggle A-Z / Z-A Sort"
+                    class="spring-btn w-8 h-8 rounded-full bg-shell hover:bg-[#ECEEF5] text-obsidian flex items-center justify-center text-[11px] font-extrabold"
+                  >
+                    A↓Z
+                  </button>
+                </div>
+              </div>
+
+              <!-- Recurring rules drawer (templates live here, not in the monthly list) -->
+              <div id="recurringRulesDrawer" class="hidden bg-skypill-bg/40 rounded-[20px] p-3 sm:p-4 mb-3 border border-black/[0.03]"></div>
+
+              <!-- One row per paycheck / bill for the month -->
+              <div id="overviewTransactionList" class="divide-y divide-shell"></div>
+            </div>
+          </div>
+
+          <!-- =============================================================== -->
+          <!-- RIGHT ELEVATED ANALYTICS PANEL (#F5F6FA, ~36% width)            -->
+          <!-- =============================================================== -->
+          <aside class="bg-panel rounded-[26px] p-6 sm:p-7 flex flex-col justify-between gap-6 border border-black/[0.03] min-w-0 xl:sticky xl:top-[88px]">
+            <div>
+              <!-- Top Centered Metric Header + Top-Right 3-Dots Metric Switcher -->
+              <div class="relative text-center pt-1">
+                <div class="relative inline-block" id="analyticsMetricDropdownWrap">
+                  <button
+                    type="button"
+                    onclick="toggleAnalyticsMetricMenu()"
+                    class="inline-flex items-center gap-1.5 text-[13px] font-semibold text-muted hover:text-obsidian transition"
+                  >
+                    <span id="analyticsMetricTitle">Monthly Net Cash Flow</span>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4">
+                      <polyline points="6 9 12 15 18 9"/>
+                    </svg>
+                  </button>
+
+                  <div id="analyticsMetricMenu" class="hidden absolute left-1/2 -translate-x-1/2 mt-2 w-52 bg-obsidian text-white rounded-[18px] shadow-popover py-1.5 z-40 text-left">
+                    <button type="button" onclick="setAnalyticsMetricMode('saved'); toggleAnalyticsMetricMenu();" class="w-full px-4 py-2 text-[12.5px] font-semibold hover:bg-white/10 flex items-center justify-between">
+                      <span>Monthly Net Cash Flow</span>
+                      <span id="checkMetricSaved" class="text-emerald-400">✓</span>
+                    </button>
+                    <div class="border-t border-white/10"></div>
+                    <button type="button" onclick="setAnalyticsMetricMode('daily'); toggleAnalyticsMetricMenu();" class="w-full px-4 py-2 text-[12.5px] font-semibold hover:bg-white/10 flex items-center justify-between">
+                      <span>Monthly Daily Earnings</span>
+                      <span id="checkMetricDaily" class="hidden text-emerald-400">✓</span>
+                    </button>
+                    <div class="border-t border-white/10"></div>
+                    <button type="button" onclick="setAnalyticsMetricMode('networth'); toggleAnalyticsMetricMenu();" class="w-full px-4 py-2 text-[12.5px] font-semibold hover:bg-white/10 flex items-center justify-between">
+                      <span>Net Worth</span>
+                      <span id="checkMetricNetworth" class="hidden text-emerald-400">✓</span>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Top-Right 3-Dots Button -->
+                <button
+                  type="button"
+                  onclick="toggleAnalyticsMetricMenu()"
+                  aria-label="Analytics options"
+                  class="absolute right-0 top-0 w-7 h-7 rounded-full hover:bg-black/5 flex items-center justify-center text-obsidian"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/>
+                  </svg>
+                </button>
+
+                <!-- Large Bold Centered Figure -->
+                <div id="analyticsHeroFigure" class="text-[31px] sm:text-[34px] font-extrabold text-obsidian tracking-tight tabular-nums mt-1.5">
+                  $25,999.00
+                </div>
+              </div>
+
+              <!-- Timeframe Tabs (Day | Week | Month | Year) -->
+              <div class="flex items-center justify-center gap-5 sm:gap-7 mt-5 text-[12.5px]">
+                <button type="button" data-tf="day" onclick="setAnalyticsTimeframe('day')" class="tf-tab-btn font-semibold text-muted hover:text-obsidian transition">Day</button>
+                <button type="button" data-tf="week" onclick="setAnalyticsTimeframe('week')" class="tf-tab-btn font-semibold text-muted hover:text-obsidian transition">Week</button>
+                <button type="button" data-tf="month" onclick="setAnalyticsTimeframe('month')" class="tf-tab-btn font-extrabold text-obsidian transition">Month</button>
+                <button type="button" data-tf="year" onclick="setAnalyticsTimeframe('year')" class="tf-tab-btn font-semibold text-muted hover:text-obsidian transition">Year</button>
+              </div>
+
+              <!-- Smooth Monochromatic Wave Line Chart (SVG) -->
+              <div class="mt-4 relative select-none">
+                <svg id="analyticsWaveSvg" viewBox="0 0 360 220" class="w-full h-[225px] overflow-visible"></svg>
+
+                <!-- Interactive 6-Month X-Axis Pills (Clicking any month switches active month!) -->
+                <div id="waveMonthAxis" class="grid grid-cols-6 gap-1 items-center text-center mt-1"></div>
+              </div>
+            </div>
+
+            <!-- Bottom Stacked Dark Goal Card (#18191D) -->
+            <div class="pt-3">
+              <!-- Two Layered Translucent Stacked-Card Shadows Behind Main Card -->
+              <div class="mx-7 h-2.5 rounded-t-[16px] bg-obsidian/15"></div>
+              <div class="mx-4 h-2.5 rounded-t-[18px] bg-obsidian/30 -mt-0.5"></div>
+
+              <div
+                id="goalCard"
+                onclick="if(!goalDragMoved) openProfileGoalModal()"
+                title="Total savings vs your goal · scroll or drag to browse months · click to edit target"
+                class="goal-swipe spring-btn cursor-pointer bg-obsidian text-white rounded-[22px] p-5 -mt-0.5 flex items-center justify-between gap-4 shadow-card"
+              >
+                <div>
+                  <div id="goalCardMonthTitle" class="text-[12.5px] font-medium text-white/65">Savings goal · Nov 2026</div>
+                  <div id="goalCardStatusText" class="text-[18px] font-extrabold tracking-tight text-white mt-0.5">Completed</div>
+                  <div id="goalCardSubAmount" class="text-[11px] font-medium text-white/55 tabular-nums mt-1">$25,999 / $30,000</div>
+                </div>
+
+                <!-- Circular Segmented Progress Ring -->
+                <div class="relative w-[68px] h-[68px] flex items-center justify-center shrink-0">
+                  <svg viewBox="0 0 72 72" class="w-full h-full -rotate-90">
+                    <circle cx="36" cy="36" r="28" fill="none" stroke="rgba(255,255,255,0.16)" stroke-width="8" stroke-dasharray="3.5 3" />
+                    <circle
+                      id="goalRingArc"
+                      cx="36"
+                      cy="36"
+                      r="28"
+                      fill="none"
+                      stroke="#FFFFFF"
+                      stroke-width="8"
+                      stroke-linecap="butt"
+                      stroke-dasharray="175.93"
+                      stroke-dashoffset="44"
+                    />
+                  </svg>
+                  <span id="goalRingPctLabel" class="absolute text-[14px] font-extrabold text-white tabular-nums">87%</span>
+                </div>
+              </div>
+            </div>
+          </aside>
+        </section>
+
+        <!-- =============================================================== -->
+        <!-- VIEW 2-5: DEDICATED CATEGORY SIDE TABS (SAVINGS/DEBT/EXP/INC)   -->
+        <!-- =============================================================== -->
+        <section id="view-category" class="view-section hidden flex-col gap-6">
+          <!-- Category KPI Banner -->
+          <div class="bg-shell rounded-[24px] p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 border border-black/[0.03]">
+            <div class="flex items-center gap-4">
+              <div id="catTabHeroIcon" class="w-14 h-14 rounded-2xl bg-obsidian text-white flex items-center justify-center shrink-0 shadow-sm"></div>
+              <div>
+                <div class="flex items-center gap-2">
+                  <h2 id="catTabTitle" class="text-[26px] font-extrabold text-obsidian tracking-tight">Savings &amp; Assets</h2>
+                  <span id="catTabMonthBadge" class="bg-white border border-black/[0.05] rounded-full px-2.5 py-0.5 text-[12px] font-bold text-obsidian tabular-nums">Nov 2026</span>
+                </div>
+                <p id="catTabSubtitle" class="text-[14px] text-muted mt-0.5">Manage active, pending, and recurring items.</p>
+              </div>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-4">
+              <div id="catTabDailyExtraBox" class="hidden bg-white rounded-2xl px-4 py-2.5 border border-black/[0.05]">
+                <span id="catTabDailyExtraLabel" class="text-[11px] font-bold uppercase tracking-wider text-muted block">Month Daily Earnings</span>
+                <span id="catTabDailyExtraValue" class="text-[17px] font-extrabold text-[#1F7A4C] tabular-nums">+$0.00</span>
+                <span id="catTabDailyExtraSub" class="text-[11px] font-semibold text-muted block tabular-nums"></span>
+              </div>
+
+              <div class="bg-obsidian text-white rounded-2xl px-5 py-3 shadow-sm">
+                <span id="catTabTotalLabel" class="text-[11px] font-semibold uppercase tracking-wider text-white/65 block">Total</span>
+                <span id="catTabTotalValue" class="text-[22px] font-extrabold tabular-nums">$0.00</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Monthly Budgets (Expenses tab only) -->
+          <div id="catBudgetsPanel" class="hidden bg-shell rounded-[22px] p-4 sm:p-5 border border-black/[0.03]"></div>
+
+          <!-- Clean 1-Row Quick-Add Form for Active Category -->
+          <form onsubmit="handleCategoryTabQuickAdd(event)" class="bg-shell rounded-[22px] p-4 sm:p-5 border border-black/[0.03] grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-center">
+            <input
+              id="catQuickTitle"
+              type="text"
+              required
+              maxlength="60"
+              placeholder="Title (e.g., High-Yield Vault, Rent, Freelance)"
+              class="sm:col-span-4 bg-white border border-black/[0.08] focus:border-obsidian rounded-2xl px-4 py-2.5 text-[13.5px] font-medium text-obsidian placeholder-muted outline-none"
+            />
+
+            <div class="sm:col-span-2 relative">
+              <span class="currency-prefix-sym absolute left-3.5 top-1/2 -translate-y-1/2 text-[13px] font-bold text-muted pointer-events-none">$</span>
+              <input
+                id="catQuickAmount"
+                type="number"
+                min="0.01"
+                step="any"
+                required
+                placeholder="0.00"
+                class="w-full bg-white border border-black/[0.08] focus:border-obsidian rounded-2xl pl-9 pr-3 py-2.5 text-[14px] font-bold text-obsidian tabular-nums outline-none"
+              />
+            </div>
+
+            <input
+              id="catQuickDate"
+              type="date"
+              required
+              aria-label="Date"
+              class="sm:col-span-2 bg-white border border-black/[0.08] focus:border-obsidian rounded-2xl px-3.5 py-2.5 text-[13px] font-bold text-obsidian tabular-nums outline-none"
+            />
+
+            <select
+              id="catQuickStatus"
+              aria-label="Type"
+              class="sm:col-span-2 bg-white border border-black/[0.08] focus:border-obsidian rounded-2xl px-3.5 py-2.5 text-[13px] font-bold text-obsidian outline-none cursor-pointer"
+            >
+            </select>
+
+            <button
+              type="submit"
+              class="sm:col-span-2 spring-btn bg-obsidian hover:bg-[#2A2C33] text-white text-[13.5px] font-bold rounded-2xl py-2.5 px-4"
+            >
+              + Add
+            </button>
+          </form>
+
+          <!-- Filter Row: Status Pills (All, Active, Pending, Recurring) + Scope Toggle (This Month vs All Months) -->
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div class="flex flex-wrap items-center gap-1.5">
+              <button type="button" data-cat-status="all" onclick="setCategoryTabStatusFilter('all')" class="cat-status-pill px-3.5 py-1.5 rounded-full text-[12px] font-bold bg-obsidian text-white">All</button>
+              <button type="button" data-cat-status="pending" onclick="setCategoryTabStatusFilter('pending')" class="cat-status-pill px-3.5 py-1.5 rounded-full text-[12px] font-semibold bg-shell text-muted hover:text-obsidian">Pending</button>
+              <button type="button" data-cat-status="completed" onclick="setCategoryTabStatusFilter('completed')" class="cat-status-pill px-3.5 py-1.5 rounded-full text-[12px] font-semibold bg-shell text-muted hover:text-obsidian">Completed</button>
+              <button type="button" data-cat-status="scheduled" onclick="setCategoryTabStatusFilter('scheduled')" class="cat-status-pill px-3.5 py-1.5 rounded-full text-[12px] font-semibold bg-shell text-muted hover:text-obsidian">Scheduled</button>
+            </div>
+
+            <div class="inline-flex bg-shell p-1 rounded-full text-[12px] font-bold">
+              <button type="button" id="scopeMonthBtn" onclick="setCategoryScope('month')" class="px-3.5 py-1 rounded-full bg-white text-obsidian shadow-xs transition">Active Month</button>
+              <button type="button" id="scopeAllBtn" onclick="setCategoryScope('all')" class="px-3.5 py-1 rounded-full text-muted hover:text-obsidian transition">All Months</button>
+            </div>
+          </div>
+
+          <!-- Category Item List -->
+          <div id="categoryTabItemsList" class="divide-y divide-shell"></div>
+        </section>
+
+        <!-- =============================================================== -->
+        <!-- VIEW 6: EXPANDED FULL-SCREEN DAILY EARNING CALENDAR TAB         -->
+        <!-- =============================================================== -->
+        <section id="view-calendar" class="view-section hidden flex-col gap-6">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div class="flex items-center gap-3 flex-wrap">
+                <h2 id="fullCalHeading" class="text-[21px] font-extrabold text-obsidian tracking-tight">Daily Earning Calendar</h2>
+                <span id="fullCalMonthBadge" class="bg-white border border-black/[0.05] rounded-full px-2.5 py-0.5 text-[12px] font-bold text-obsidian tabular-nums">November 2026</span>
+              </div>
+              <p class="text-[13px] text-muted mt-0.5">Select any day to inspect past earnings or log new daily income.</p>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-2">
+              <span id="fullCalMonthTotal" class="px-4 py-2 rounded-full bg-mint-bg text-mint-text text-[13px] font-extrabold tabular-nums">
+                Month Total: +$0.00
+              </span>
+              <span id="fullCalWeekTotal" class="px-4 py-2 rounded-full bg-shell text-[#1F7A4C] text-[13px] font-extrabold tabular-nums">
+                Week: +$0.00
+              </span>
+              <span id="fullCalAvgDaily" class="px-4 py-2 rounded-full bg-shell text-obsidian text-[13px] font-bold tabular-nums">
+                Avg / Active Day: $0.00
+              </span>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-[minmax(0,1.5fr)_minmax(300px,1fr)] gap-6 items-start">
+            <!-- Large Interactive Calendar Grid -->
+            <div class="bg-shell rounded-[24px] p-5 sm:p-6 border border-black/[0.03]">
+              <div class="grid grid-cols-7 gap-2 text-center text-[11.5px] font-bold uppercase tracking-wider text-muted mb-2">
+                <div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div><div>Sun</div>
+              </div>
+              <div id="fullCalendarGrid" class="grid grid-cols-7 gap-2"></div>
+            </div>
+
+            <!-- Selected Day Inspector & Daily Earning Logger -->
+            <div class="bg-shell rounded-[24px] p-6 border border-black/[0.03] flex flex-col gap-4">
+              <div>
+                <span class="text-[11px] font-bold uppercase tracking-wider text-muted">Selected Day</span>
+                <div class="flex items-center justify-between mt-0.5">
+                  <h3 id="fullCalSelectedDateTitle" class="text-[18px] font-extrabold text-obsidian tabular-nums">Mon, Nov 16, 2026</h3>
+                  <span id="fullCalSelectedDayTotal" class="px-3 py-1 rounded-full bg-obsidian text-white text-[12.5px] font-extrabold tabular-nums">+$0.00</span>
+                </div>
+              </div>
+
+              <form onsubmit="handleRecordDailyEarning(event, 'full')" class="flex flex-col gap-2.5 pt-3 border-t border-black/[0.06]">
+                <div class="flex items-center gap-1.5">
+                  <button type="button" onclick="bumpDailyEarningInput(20, 'full')" class="spring-btn flex-1 bg-white hover:bg-obsidian hover:text-white text-obsidian text-[12px] font-bold py-1.5 rounded-full border border-black/[0.05] tabular-nums">+<span class="quick-sym">$</span>20</button>
+                  <button type="button" onclick="bumpDailyEarningInput(50, 'full')" class="spring-btn flex-1 bg-white hover:bg-obsidian hover:text-white text-obsidian text-[12px] font-bold py-1.5 rounded-full border border-black/[0.05] tabular-nums">+<span class="quick-sym">$</span>50</button>
+                  <button type="button" onclick="bumpDailyEarningInput(100, 'full')" class="spring-btn flex-1 bg-white hover:bg-obsidian hover:text-white text-obsidian text-[12px] font-bold py-1.5 rounded-full border border-black/[0.05] tabular-nums">+<span class="quick-sym">$</span>100</button>
+                </div>
+
+                <div class="relative">
+                  <span class="currency-prefix-sym absolute left-3.5 top-1/2 -translate-y-1/2 text-[14px] font-bold text-muted pointer-events-none">$</span>
+                  <input
+                    id="fullDailyAmount"
+                    type="number"
+                    min="0.01"
+                    step="any"
+                    required
+                    placeholder="0.00"
+                    class="w-full bg-white border border-black/[0.08] focus:border-obsidian rounded-2xl pl-9 pr-3.5 py-2.5 text-[15px] font-bold text-obsidian tabular-nums outline-none"
+                  />
+                </div>
+
+                <input
+                  id="fullDailyNote"
+                  type="text"
+                  maxlength="60"
+                  placeholder="Earning source or note..."
+                  class="w-full bg-white border border-black/[0.08] focus:border-obsidian rounded-2xl px-4 py-2.5 text-[13.5px] font-medium text-obsidian placeholder-muted outline-none"
+                />
+
+                <select id="fullDailyStatus" aria-label="Earning status" class="w-full bg-white border border-black/[0.08] focus:border-obsidian rounded-2xl px-4 py-2.5 text-[13.5px] font-bold text-obsidian outline-none cursor-pointer">
+                  <option value="Received">Received — add to cash now</option>
+                  <option value="Pending">Pending — not paid yet</option>
+                </select>
+
+                <button type="submit" class="spring-btn bg-obsidian hover:bg-[#2A2C33] text-white text-[13.5px] font-bold rounded-2xl py-2.5">
+                  + Record for Selected Date
+                </button>
+              </form>
+
+              <div class="pt-3 border-t border-black/[0.06]">
+                <div class="text-[12px] font-bold uppercase tracking-wider text-muted mb-2.5">Recorded Entries on Date</div>
+                <div id="fullCalDayEntriesList" class="flex flex-col gap-2 max-h-64 overflow-y-auto"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- FLOATING DARK ACTION POPOVER MENU (#18191D) FOR TRANSACTION ROWS      -->
+  <!-- ===================================================================== -->
+  <div
+    id="rowActionPopover"
+    class="hidden fixed z-50 w-48 bg-obsidian text-white rounded-[18px] shadow-popover overflow-hidden border border-white/10 text-[12.5px] font-semibold"
+  >
+    <div id="rowActionPopoverBody"></div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- MODAL 1: ADD / EDIT ENTRY MODAL                                       -->
+  <!-- ===================================================================== -->
+  <div id="entryModalBackdrop" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-md rounded-[28px] border border-black/[0.06] shadow-2xl p-6 sm:p-7">
+      <div class="flex items-center justify-between mb-5">
+        <h3 id="entryModalTitle" class="text-[19px] font-extrabold text-obsidian">Add Entry</h3>
+        <button type="button" onclick="closeEntryModal()" class="w-8 h-8 rounded-full bg-shell hover:bg-[#E7E9F0] text-obsidian flex items-center justify-center text-sm font-bold">✕</button>
+      </div>
+
+      <form onsubmit="saveEntryModalForm(event)" class="flex flex-col gap-4">
+        <input type="hidden" id="modalEditId" />
+
+        <!-- Category Pills -->
+        <div>
+          <label class="text-[11.5px] font-bold uppercase tracking-wider text-muted block mb-1.5">Category</label>
+          <div class="grid grid-cols-4 bg-shell p-1 rounded-2xl text-[12px] font-bold">
+            <button type="button" data-m-cat="income" onclick="setModalCategory('income')" class="m-cat-btn py-1.5 rounded-xl bg-obsidian text-white transition">Income</button>
+            <button type="button" data-m-cat="savings" onclick="setModalCategory('savings')" class="m-cat-btn py-1.5 rounded-xl text-muted transition">Savings</button>
+            <button type="button" data-m-cat="debt" onclick="setModalCategory('debt')" class="m-cat-btn py-1.5 rounded-xl text-muted transition">Debt</button>
+            <button type="button" data-m-cat="expenses" onclick="setModalCategory('expenses')" class="m-cat-btn py-1.5 rounded-xl text-muted transition">Expenses</button>
+          </div>
+        </div>
+
+        <div>
+          <label class="text-[12px] font-bold text-obsidian block mb-1">Title</label>
+          <input id="modalTitleInput" type="text" required placeholder="e.g., Monthly Salary, Emergency Vault, Rent" class="w-full bg-shell border border-black/[0.06] focus:border-obsidian focus:bg-white rounded-2xl px-4 py-2.5 text-[14px] font-medium outline-none transition" />
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label id="modalAmountLabel" class="text-[12px] font-bold text-obsidian block mb-1">Amount</label>
+            <input id="modalAmountInput" type="number" min="0.01" step="any" required placeholder="0.00" class="w-full bg-shell border border-black/[0.06] focus:border-obsidian focus:bg-white rounded-2xl px-4 py-2.5 text-[14px] font-bold tabular-nums outline-none transition" />
+          </div>
+
+          <div>
+            <label id="modalDateLabel" class="text-[12px] font-bold text-obsidian block mb-1">Date</label>
+            <input id="modalDateInput" type="date" required class="w-full bg-shell border border-black/[0.06] focus:border-obsidian focus:bg-white rounded-2xl px-3.5 py-2.5 text-[13.5px] font-bold tabular-nums outline-none transition" />
+          </div>
+        </div>
+
+        <div>
+          <label class="text-[11.5px] font-bold uppercase tracking-wider text-muted block mb-1.5">Type</label>
+          <div id="modalStatusGroup" class="grid grid-cols-3 bg-shell p-1 rounded-2xl text-[12px] font-bold"></div>
+          <p id="modalTypeHint" class="text-[11.5px] font-medium text-muted mt-1.5"></p>
+        </div>
+
+        <label id="modalBudgetRepeatWrap" class="hidden flex items-center gap-2 text-[12.5px] font-semibold text-obsidian cursor-pointer">
+          <input id="modalBudgetRepeat" type="checkbox" class="w-4 h-4 accent-[#18191D]" /> Repeat this budget every month
+        </label>
+
+        <label id="modalFromCashWrap" class="hidden flex items-center gap-2 text-[12.5px] font-semibold text-obsidian cursor-pointer">
+          <input id="modalFromCash" type="checkbox" class="w-4 h-4 accent-[#18191D]" /> Money was moved from my cash balance
+        </label>
+
+        <div id="modalDebtLinkWrap" class="hidden">
+          <label class="text-[12px] font-bold text-obsidian block mb-1">Pays toward</label>
+          <select id="modalDebtLink" class="w-full bg-shell border border-black/[0.06] focus:border-obsidian focus:bg-white rounded-2xl px-3.5 py-2.5 text-[13.5px] font-semibold outline-none cursor-pointer"></select>
+        </div>
+
+        <p id="modalLockNote" class="hidden text-[11.5px] font-semibold text-skypill-text bg-skypill-bg rounded-xl px-3 py-2">This entry is linked to other records, so its category and type are locked. You can still change the title, amount and date.</p>
+        <p id="modalErrorText" class="hidden text-[12px] font-semibold text-rose-700 bg-rose-50 rounded-xl px-3 py-2"></p>
+
+        <div class="flex items-center justify-end gap-2 mt-2">
+          <button type="button" onclick="closeEntryModal()" class="spring-btn px-4 py-2.5 rounded-2xl text-[13px] font-bold text-muted hover:bg-shell">Cancel</button>
+          <button type="submit" class="spring-btn bg-obsidian text-white px-5 py-2.5 rounded-2xl text-[13px] font-bold">Save Entry</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- MODAL 2: PROFILE & MONTHLY TARGET MODAL                               -->
+  <!-- ===================================================================== -->
+  <div id="profileGoalModalBackdrop" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-sm rounded-[28px] border border-black/[0.06] shadow-2xl p-6">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-[18px] font-extrabold text-obsidian">Profile, Goal &amp; Opening Cash</h3>
+        <button type="button" onclick="closeProfileGoalModal()" class="w-8 h-8 rounded-full bg-shell text-obsidian flex items-center justify-center text-sm font-bold">✕</button>
+      </div>
+      <form onsubmit="saveProfileGoalForm(event)" class="flex flex-col gap-4">
+        <div>
+          <label class="text-[12px] font-bold text-obsidian block mb-1">Card Holder Name</label>
+          <input id="profileNameInput" type="text" required maxlength="32" class="w-full bg-shell border border-black/[0.06] focus:border-obsidian focus:bg-white rounded-2xl px-4 py-2.5 text-[14px] font-semibold outline-none" />
+        </div>
+        <div>
+          <label class="text-[12px] font-bold text-obsidian block mb-1">Savings Goal (total in savings &amp; investments)</label>
+          <input id="profileGoalTargetInput" type="number" min="100" step="any" required class="w-full bg-shell border border-black/[0.06] focus:border-obsidian focus:bg-white rounded-2xl px-4 py-2.5 text-[14px] font-bold tabular-nums outline-none" />
+        </div>
+        <div>
+          <label class="text-[12px] font-bold text-obsidian block mb-1">Opening Cash Balance</label>
+          <input id="profileOpeningInput" type="number" step="any" required class="w-full bg-shell border border-black/[0.06] focus:border-obsidian focus:bg-white rounded-2xl px-4 py-2.5 text-[14px] font-bold tabular-nums outline-none" />
+          <p class="text-[11px] text-muted mt-1">Money already in your bank before your first entry (not income). Each month then opens with last month's closing cash.</p>
+        </div>
+        <div class="flex justify-end gap-2 mt-1">
+          <button type="button" onclick="closeProfileGoalModal()" class="px-4 py-2 rounded-2xl text-[13px] font-bold text-muted">Cancel</button>
+          <button type="submit" class="spring-btn bg-obsidian text-white px-5 py-2 rounded-2xl text-[13px] font-bold">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- MODAL 3: COMPLETE / PAY (keeps the original, records a linked actual) -->
+  <!-- ===================================================================== -->
+  <div id="settleModalBackdrop" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-sm rounded-[28px] border border-black/[0.06] shadow-2xl p-6">
+      <div class="flex items-center justify-between mb-2">
+        <h3 id="settleModalTitle" class="text-[18px] font-extrabold text-obsidian">Complete</h3>
+        <button type="button" onclick="closeSettleModal()" class="w-8 h-8 rounded-full bg-shell text-obsidian flex items-center justify-center text-sm font-bold">✕</button>
+      </div>
+      <p id="settleModalDesc" class="text-[12.5px] text-muted mb-4"></p>
+      <form onsubmit="submitSettleForm(event)" class="flex flex-col gap-3.5">
+        <div id="settleNameWrap" class="hidden">
+          <label class="text-[12px] font-bold text-obsidian block mb-1">What did you spend on?</label>
+          <input id="settleNameInput" type="text" maxlength="60" placeholder="e.g., Weekly groceries" class="w-full bg-shell border border-black/[0.06] focus:border-obsidian focus:bg-white rounded-2xl px-4 py-2.5 text-[14px] font-medium outline-none" />
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="text-[12px] font-bold text-obsidian block mb-1">Amount</label>
+            <input id="settleAmountInput" type="number" min="0.01" step="any" required class="w-full bg-shell border border-black/[0.06] focus:border-obsidian focus:bg-white rounded-2xl px-4 py-2.5 text-[14px] font-bold tabular-nums outline-none" />
+          </div>
+          <div>
+            <label class="text-[12px] font-bold text-obsidian block mb-1">Date</label>
+            <input id="settleDateInput" type="date" required class="w-full bg-shell border border-black/[0.06] focus:border-obsidian focus:bg-white rounded-2xl px-3.5 py-2.5 text-[13.5px] font-bold tabular-nums outline-none" />
+          </div>
+        </div>
+        <label id="settleFromCashWrap" class="hidden flex items-center gap-2 text-[12.5px] font-semibold text-obsidian cursor-pointer">
+          <input id="settleFromCash" type="checkbox" class="w-4 h-4 accent-[#18191D]" /> Move this money out of my cash balance
+        </label>
+        <p id="settleErrorText" class="hidden text-[12px] font-semibold text-rose-700 bg-rose-50 rounded-xl px-3 py-2"></p>
+        <div class="flex justify-end gap-2 mt-1">
+          <button type="button" onclick="closeSettleModal()" class="px-4 py-2 rounded-2xl text-[13px] font-bold text-muted">Cancel</button>
+          <button id="settleSubmitBtn" type="submit" class="spring-btn bg-obsidian text-white px-5 py-2 rounded-2xl text-[13px] font-bold">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Subtle Floating Toast -->
+  <div id="payToast" class="fixed bottom-5 left-1/2 -translate-x-1/2 translate-y-16 opacity-0 pointer-events-none z-50 bg-obsidian text-white text-[12.5px] font-bold px-4 py-2.5 rounded-full shadow-lg flex items-center gap-2 transition-all duration-300">
+    <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+    <span id="payToastText">Saved</span>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- APPLICATION LOGIC & STATE MANAGEMENT                                  -->
+  <!-- ===================================================================== -->
+  <script src="./finance-engine.js"></script>
+  <script>
+    // =========================================================================
+    // All money calculations live in finance-engine.js (window.FinanceEngine)
+    // so every view uses the same rules. This file only renders and wires UI.
+    // =========================================================================
+    const FE = window.FinanceEngine;
+    const STORAGE_KEY = 'payflow_minimal_v1';
+    const BACKUP_INDEX_KEY = 'payflow_backups_index';
+    const MAX_BACKUPS = 10;
+    const TODAY_DATE_STR = FE.localDateStr(new Date());
+    const TODAY_MONTH_STR = TODAY_DATE_STR.slice(0, 7);
+
+    const CURRENCIES = {
+      MYR: { symbol: 'RM', decimals: 2 },
+      USD: { symbol: '$', decimals: 2 },
+      EUR: { symbol: '€', decimals: 2 },
+      GBP: { symbol: '£', decimals: 2 },
+      SGD: { symbol: 'S$', decimals: 2 }
+    };
+
+    // Entry types offered per category (Add/Edit modal + quick-add bar).
+    const TYPE_OPTIONS = {
+      income: [
+        { label: 'Completed', kind: 'income', status: 'Received' },
+        { label: 'Pending', kind: 'income', status: 'Pending' },
+        { label: 'Scheduled', kind: 'income', status: 'Recurring' }
+      ],
+      expenses: [
+        { label: 'Completed', kind: 'expense', status: 'Paid' },
+        { label: 'Pending', kind: 'bill', status: 'Unpaid' },
+        { label: 'Scheduled', kind: 'bill', status: 'Recurring' },
+        { label: 'Budget', kind: 'budget', status: 'Budget' }
+      ],
+      debt: [
+        { label: 'Balance owed', kind: 'debt', status: 'Outstanding' },
+        { label: 'Payment', kind: 'debt_payment', status: 'Paid' },
+        { label: 'Scheduled', kind: 'debt_payment', status: 'Recurring' }
+      ],
+      savings: [
+        { label: 'Balance', kind: 'savings', status: 'Active' },
+        { label: 'Pending', kind: 'savings', status: 'Planned' },
+        { label: 'Scheduled', kind: 'savings', status: 'Recurring' }
+      ]
+    };
+
+    function createSampleState() {
+      const cur = TODAY_MONTH_STR;
+      const prev = FE.addMonths(cur, -1);
+      const prev2 = FE.addMonths(cur, -2);
+      const todayDay = Number(TODAY_DATE_STR.slice(8, 10));
+      const d = (ym, day) => FE.clampDay(ym, day);
+      const past = day => d(cur, Math.min(day, todayDay)); // actual money is never dated in the future
+      const ago = n => { const [y, m, dd] = TODAY_DATE_STR.split('-').map(Number); return FE.localDateStr(new Date(y, m - 1, dd - n)); };
+      const inc = (o) => ({ category: 'income', kind: 'income', month: (o.date || '').slice(0, 7), ...o });
+      const exp = (o) => ({ category: 'expenses', month: (o.date || '').slice(0, 7), ...o });
+      const dbt = (o) => ({ category: 'debt', month: (o.date || '').slice(0, 7), ...o });
+      const sav = (o) => ({ category: 'savings', kind: 'savings', month: (o.date || '').slice(0, 7), ...o });
+      const sal = 's_salary_tpl__' + cur;
+      const rent = 's_rent_tpl__' + cur;
+      return {
+        schemaVersion: FE.SCHEMA_VERSION,
+        userName: 'Alex',
+        currency: 'USD',
+        activeMonth: cur,
+        selectedDate: TODAY_DATE_STR,
+        monthlyGoalTarget: 4000,
+        openingBalance: 8200,
+        analyticsMetric: 'saved',
+        analyticsTimeframe: 'month',
+        records: [
+          inc({ id: 's_salary_tpl', name: 'Product Design Salary', amount: 6200, date: d(cur, 1), generateFrom: cur, status: 'Recurring' }),
+          inc({ id: sal, name: 'Product Design Salary', amount: 6200, date: d(cur, 1), status: 'Completed', templateId: 's_salary_tpl', period: cur, settledTxId: 's_salary_tx', completedAt: d(cur, 1) }),
+          inc({ id: 's_salary_tx', name: 'Product Design Salary', amount: 6200, date: d(cur, 1), status: 'Received', sourceId: sal, ref: 'settle:' + sal }),
+          inc({ id: 's_salary_prev', name: 'Product Design Salary', amount: 6200, date: d(prev, 1), status: 'Received' }),
+          inc({ id: 's_retainer', name: 'Advisory Retainer', amount: 1450, date: past(10), status: 'Received' }),
+          inc({ id: 's_bonus', name: 'UI Audit Bonus', amount: 850, date: d(cur, 24), status: 'Pending' }),
+          sav({ id: 's_vault', name: 'High-Yield Reserve Vault', amount: 17573, date: d(prev2, 3), status: 'Active', fromCash: false }),
+          sav({ id: 's_invest_tpl', name: 'S&P 500 Auto-Invest', amount: 450, date: d(cur, 5), generateFrom: cur, status: 'Recurring', fromCash: true }),
+          sav({ id: 's_topup', name: 'Emergency Top-Up', amount: 1200, date: d(cur, 26), status: 'Planned', fromCash: true }),
+          dbt({ id: 's_gear', kind: 'debt', name: 'Zero-APR Studio Gear', amount: 1850, principal: 1850, date: d(prev, 13), status: 'Partial' }),
+          dbt({ id: 's_gear_pay1', kind: 'debt_payment', name: 'Payment · Zero-APR Studio Gear', amount: 300, date: past(8), status: 'Paid', debtId: 's_gear' }),
+          dbt({ id: 's_auto', kind: 'debt', name: 'Auto Financing', amount: 9800, principal: 9800, date: d(prev2, 1), status: 'Partial' }),
+          dbt({ id: 's_auto_prev', kind: 'debt_payment', name: 'Auto Financing Instalment', amount: 420, date: d(prev, 15), status: 'Paid', debtId: 's_auto' }),
+          dbt({ id: 's_auto_tpl', kind: 'debt_payment', name: 'Auto Financing Instalment', amount: 420, date: d(cur, 15), generateFrom: cur, status: 'Recurring', debtId: 's_auto' }),
+          dbt({ id: 's_travelcard', kind: 'debt', name: 'Travel Card Statement', amount: 310, principal: 310, date: past(9), status: 'Outstanding' }),
+          exp({ id: 's_rent_tpl', kind: 'bill', name: 'Apartment Lease', amount: 1650, date: d(cur, 6), generateFrom: cur, status: 'Recurring' }),
+          exp({ id: rent, kind: 'bill', name: 'Apartment Lease', amount: 1650, date: d(cur, 6), status: 'Completed', templateId: 's_rent_tpl', period: cur, settledTxId: 's_rent_tx', completedAt: past(6) }),
+          exp({ id: 's_rent_tx', kind: 'bill', name: 'Apartment Lease', amount: 1650, date: past(6), status: 'Paid', sourceId: rent, ref: 'settle:' + rent }),
+          exp({ id: 's_rent_prev', kind: 'bill', name: 'Apartment Lease', amount: 1650, date: d(prev, 6), status: 'Paid' }),
+          exp({ id: 's_tools_tpl', kind: 'bill', name: 'Cloud & Design Tools', amount: 89, date: d(cur, 15), generateFrom: cur, status: 'Recurring' }),
+          exp({ id: 's_flight', kind: 'bill', name: 'Flight Booking', amount: 410, date: d(cur, 22), status: 'Unpaid' }),
+          exp({ id: 's_groceries_budget', kind: 'budget', name: 'Groceries', amount: 600, date: d(prev, 1), generateFrom: prev, status: 'Recurring' }),
+          exp({ id: 's_wholefoods', kind: 'expense', name: 'Whole Foods & Groceries', amount: 320, date: past(4), status: 'Paid', budgetId: 's_groceries_budget' }),
+          exp({ id: 's_groceries_prev', kind: 'expense', name: 'Weekly Groceries', amount: 540, date: d(prev, 12), status: 'Paid', budgetId: 's_groceries_budget' }),
+          exp({ id: 's_dining_budget', kind: 'budget', name: 'Dining Out', amount: 250, date: d(cur, 1), status: 'Budget' })
+        ],
+        dailyEarnings: [
+          { id: 'de_s1', date: ago(40), amount: 220, note: 'Brand Guidelines Sprint', time: '02:15 PM', status: 'Received' },
+          { id: 'de_s2', date: ago(29), amount: 340, note: 'Storefront Digital Sales', time: '05:40 PM', status: 'Received' },
+          { id: 'de_s3', date: ago(21), amount: 190, note: 'Consulting Call', time: '11:10 AM', status: 'Received' },
+          { id: 'de_s4', date: ago(14), amount: 185, note: 'Client Sprint Milestone', time: '03:20 PM', status: 'Received' },
+          { id: 'de_s5', date: ago(11), amount: 240, note: 'E-Commerce Store Sales', time: '06:10 PM', status: 'Received' },
+          { id: 'de_s6', date: ago(7), amount: 160, note: 'Design Consultation', time: '01:45 PM', status: 'Received' },
+          { id: 'de_s7', date: ago(4), amount: 310, note: 'Weekend Workshop', time: '04:00 PM', status: 'Received' },
+          { id: 'de_s8', date: ago(2), amount: 195, note: 'Digital Template Sales', time: '07:30 PM', status: 'Received' },
+          { id: 'de_s9', date: TODAY_DATE_STR, amount: 145, note: 'Landing Page Delivery', time: '10:30 AM', status: 'Received' },
+          { id: 'de_s10', date: TODAY_DATE_STR, amount: 90, note: 'Express Logo Revision (invoice sent)', time: '04:15 PM', status: 'Pending' }
+        ]
+      };
+    }
+
+    function createZeroState(currency = 'MYR', userName = 'Alex') {
+      return {
+        schemaVersion: FE.SCHEMA_VERSION,
+        userName,
+        currency,
+        activeMonth: TODAY_MONTH_STR,
+        selectedDate: TODAY_DATE_STR,
+        monthlyGoalTarget: 10000,
+        openingBalance: 0,
+        analyticsMetric: 'saved',
+        analyticsTimeframe: 'month',
+        records: [],
+        dailyEarnings: []
+      };
+    }
+
+    let currentView = 'overview';
+    let globalSearchQuery = '';
+    let overviewTxStatusFilter = 'all';
+    let overviewSortMode = 'newest';
+    let alphaAsc = true;
+    let categoryTabStatusFilter = 'all';
+    let categoryTabScope = 'month';
+    let privacyMasked = false;
+    let heroMetricMode = 'cash';
+    let modalCategory = 'income';
+    let modalTypeIdx = 0;
+    let modalTypeLocked = false;
+    let activePopoverRecordId = null;
+    let goalViewMonth = null;
+    let goalDragMoved = false;
+    let quickAddCategory = null;
+    let settleCtx = null;
+    let startupNotice = '';
+    let state = loadState();
+
+    function shiftGoalMonth(dir) {
+      const base = goalViewMonth || state.activeMonth;
+      goalViewMonth = FE.addMonths(base, dir);
+      renderOverview();
+      const card = document.getElementById('goalCard');
+      card.classList.remove('goal-slide-l', 'goal-slide-r');
+      void card.offsetWidth;
+      card.classList.add(dir > 0 ? 'goal-slide-l' : 'goal-slide-r');
+    }
+
+    function initGoalSwipe() {
+      const card = document.getElementById('goalCard');
+      if (!card) return;
+      let wheelLock = false, startX = null;
+      card.addEventListener('wheel', e => {
+        e.preventDefault();
+        if (wheelLock) return;
+        const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+        if (Math.abs(delta) < 4) return;
+        wheelLock = true;
+        shiftGoalMonth(delta > 0 ? 1 : -1);
+        setTimeout(() => { wheelLock = false; }, 280);
+      }, { passive: false });
+      card.addEventListener('pointerdown', e => { startX = e.clientX; goalDragMoved = false; });
+      card.addEventListener('pointermove', e => {
+        if (startX === null) return;
+        const dx = e.clientX - startX;
+        if (Math.abs(dx) > 50) { goalDragMoved = true; shiftGoalMonth(dx < 0 ? 1 : -1); startX = e.clientX; }
+      });
+      ['pointerup', 'pointerleave', 'pointercancel'].forEach(t => card.addEventListener(t, () => {
+        startX = null; setTimeout(() => { goalDragMoved = false; }, 0);
+      }));
+    }
+    document.addEventListener('DOMContentLoaded', initGoalSwipe);
+
+    // =========================================================================
+    // STORAGE, SAFETY BACKUPS & MIGRATION
+    // =========================================================================
+
+    function backupRaw(raw, label) {
+      try {
+        const key = `payflow_backup_${label}_${new Date().toISOString().replace(/[:.]/g, '-')}`;
+        localStorage.setItem(key, raw);
+        let idx = [];
+        try { idx = JSON.parse(localStorage.getItem(BACKUP_INDEX_KEY) || '[]'); } catch (e) { idx = []; }
+        idx.push(key);
+        while (idx.length > MAX_BACKUPS) {
+          const old = idx.shift();
+          // never delete the very first pre-update backup
+          if (old && old.indexOf('payflow_backup_v1_') === 0 && !idx.some(k => k.indexOf('payflow_backup_v1_') === 0)) { idx.unshift(old); break; }
+          localStorage.removeItem(old);
+        }
+        localStorage.setItem(BACKUP_INDEX_KEY, JSON.stringify(idx));
+        return key;
+      } catch (err) {
+        console.warn('Backup failed:', err);
+        return null;
+      }
+    }
+
+    function listBackups() {
+      try { return JSON.parse(localStorage.getItem(BACKUP_INDEX_KEY) || '[]').filter(k => localStorage.getItem(k) !== null); } catch (e) { return []; }
+    }
+
+    function maxYm(a, b) { return a > b ? a : b; }
+
+    function ensureRecurring(s) {
+      const target = s || state;
+      return FE.generateRecurring(target, maxYm(TODAY_MONTH_STR, target.activeMonth || TODAY_MONTH_STR));
+    }
+
+    function finalizeLoadedState(s) {
+      const out = { ...createZeroState(), ...s };
+      if (!/^\d{4}-\d{2}$/.test(out.activeMonth || '')) out.activeMonth = TODAY_MONTH_STR;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(out.selectedDate || '') || !out.selectedDate.startsWith(out.activeMonth)) {
+        out.selectedDate = out.activeMonth === TODAY_MONTH_STR ? TODAY_DATE_STR : `${out.activeMonth}-01`;
+      }
+      ensureRecurring(out);
+      FE.syncDebtStatuses(out);
+      return out;
+    }
+
+    function loadState() {
+      let raw = null;
+      try { raw = (window.payDesktop && window.payDesktop.load()) || localStorage.getItem(STORAGE_KEY); } catch (e) { raw = null; }
+
+      if (!raw) {
+        const sample = createSampleState();
+        const k = 4.45;
+        sample.currency = 'MYR';
+        FE.convertMoney(sample, v => Math.round((Number(v) || 0) * k * 100) / 100);
+        const s = finalizeLoadedState(sample);
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); } catch (e) {}
+        return s;
+      }
+
+      let parsed;
+      try {
+        parsed = JSON.parse(raw);
+      } catch (err) {
+        // Never overwrite data we can't read: keep a copy first.
+        backupRaw(raw, 'unreadable');
+        startupNotice = 'Saved data could not be read. A copy was kept — see Settings.';
+        return finalizeLoadedState(createZeroState());
+      }
+
+      const version = parsed && parsed.schemaVersion;
+      let backedUp = true;
+      if (version !== FE.SCHEMA_VERSION) backedUp = !!backupRaw(raw, `v${version || 1}`);
+      const result = FE.normalizeState(parsed, { today: TODAY_DATE_STR });
+      if (!result) {
+        backupRaw(raw, 'unreadable');
+        return finalizeLoadedState(createZeroState());
+      }
+      const s = finalizeLoadedState(result.state);
+      if (result.migrated) {
+        startupNotice = backedUp
+          ? 'Your data was upgraded to the new money logic. A backup of the old data was kept.'
+          : 'Your data was upgraded. The automatic backup failed — please export a backup from Settings.';
+      }
+      if (backedUp) {
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); } catch (e) {}
+      }
+      return s;
+    }
+
+    function saveState() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        if (window.payDesktop) window.payDesktop.save(JSON.stringify(state));
+      } catch (err) {
+        console.warn('localStorage save skipped:', err);
+      }
+    }
+
+    // =========================================================================
+    // DATE & MONTH HELPERS
+    // =========================================================================
+
+    function parseMonthStr(ym) {
+      const [y, m] = ym.split('-').map(Number);
+      return { year: y, monthIndex: m - 1 };
+    }
+
+    function formatMonthShort(ym) {
+      const { year, monthIndex } = parseMonthStr(ym);
+      return new Date(year, monthIndex, 1).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+    }
+
+    function formatMonthLong(ym) {
+      const { year, monthIndex } = parseMonthStr(ym);
+      return new Date(year, monthIndex, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    }
+
+    function formatShortMonthOnly(ym) {
+      const { year, monthIndex } = parseMonthStr(ym);
+      return new Date(year, monthIndex, 1).toLocaleDateString('en-US', { month: 'short' });
+    }
+
+    function formatFullDateLabel(ymd) {
+      const [y, m, d] = ymd.split('-').map(Number);
+      return new Date(y, m - 1, d).toLocaleDateString('en-US', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      });
+    }
+
+    function formatRowDate(ymd) {
+      const [y, m, d] = ymd.split('-').map(Number);
+      const dt = new Date(y, m - 1, d);
+      const day = String(d).padStart(2, '0');
+      const mon = dt.toLocaleDateString('en-US', { month: 'short' });
+      return `${day} ${mon} ${y}`;
+    }
+
+    function formatDayMon(ymd) {
+      const [y, m, d] = ymd.split('-').map(Number);
+      return new Date(y, m - 1, d).toLocaleDateString('en-US', { day: '2-digit', month: 'short' });
+    }
+
+    function addMonthsToYM(ym, delta) {
+      return FE.addMonths(ym, delta);
+    }
+
+    function shiftActiveMonth(delta) {
+      selectMonthDirect(addMonthsToYM(state.activeMonth, delta));
+    }
+
+    function selectMonthDirect(ym) {
+      state.activeMonth = ym;
+      if (!state.selectedDate.startsWith(ym)) {
+        state.selectedDate = ym === TODAY_MONTH_STR ? TODAY_DATE_STR : `${ym}-01`;
+      }
+      ensureRecurring();
+      saveState();
+      renderAll();
+    }
+
+    function jumpToTodayMonth() {
+      state.activeMonth = TODAY_MONTH_STR;
+      state.selectedDate = TODAY_DATE_STR;
+      saveState();
+      renderAll();
+    }
+
+    function selectCalendarDate(ymd) {
+      state.selectedDate = ymd;
+      state.activeMonth = ymd.slice(0, 7);
+      ensureRecurring();
+      saveState();
+      renderAll();
+    }
+
+    /** Default date for completing a scheduled item: today, unless it belongs to a past month. */
+    function defaultSettleDate(itemDate) {
+      if (!itemDate) return TODAY_DATE_STR;
+      if (itemDate.slice(0, 7) < TODAY_MONTH_STR) return itemDate;
+      return itemDate > TODAY_DATE_STR ? itemDate : TODAY_DATE_STR;
+    }
+
+    // =========================================================================
+    // CURRENCY FORMATTING
+    // =========================================================================
+
+    function formatMoney(val, compact = false) {
+      const cfg = CURRENCIES[state.currency] || CURRENCIES.USD;
+      const num = Number(val) || 0;
+      const sign = num < 0 ? '-' : '';
+      const abs = Math.abs(num);
+
+      if (compact && abs >= 1000) {
+        const k = abs / 1000;
+        return `${sign}${cfg.symbol}${Number.isInteger(k) ? k : k.toFixed(1)}k`;
+      }
+
+      return `${sign}${cfg.symbol}${abs.toLocaleString('en-US', {
+        minimumFractionDigits: cfg.decimals,
+        maximumFractionDigits: cfg.decimals
+      })}`;
+    }
+
+    function currencySymbol() {
+      return (CURRENCIES[state.currency] || CURRENCIES.USD).symbol;
+    }
+
+    function maskOr(text) {
+      return privacyMasked ? '••••••' : text;
+    }
+
+    function escapeHTML(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function metricsFor(ym) {
+      return FE.computeMonthMetrics(state, ym);
+    }
+
+    // =========================================================================
+    // NAVIGATION & GLOBAL CONTROLS
+    // =========================================================================
+
+    function switchView(viewName) {
+      currentView = viewName;
+      closeRowPopover();
+
+      document.querySelectorAll('.rail-btn[data-rail]').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.rail === viewName);
+      });
+
+      document.querySelectorAll('.mob-nav-pill[data-mob-tab]').forEach(btn => {
+        const active = btn.dataset.mobTab === viewName;
+        btn.className = active
+          ? 'mob-nav-pill px-4 py-2 rounded-full text-[14px] font-bold bg-obsidian text-white shrink-0'
+          : 'mob-nav-pill px-4 py-2 rounded-full text-[14px] font-semibold bg-white text-muted shrink-0';
+      });
+
+      const overviewEl = document.getElementById('view-overview');
+      const categoryEl = document.getElementById('view-category');
+      const calendarEl = document.getElementById('view-calendar');
+
+      overviewEl.classList.add('hidden');
+      overviewEl.classList.remove('grid');
+      categoryEl.classList.add('hidden');
+      categoryEl.classList.remove('flex');
+      calendarEl.classList.add('hidden');
+      calendarEl.classList.remove('flex');
+
+      if (viewName === 'overview') {
+        overviewEl.classList.remove('hidden');
+        overviewEl.classList.add('grid');
+      } else if (viewName === 'calendar') {
+        calendarEl.classList.remove('hidden');
+        calendarEl.classList.add('flex');
+      } else {
+        categoryEl.classList.remove('hidden');
+        categoryEl.classList.add('flex');
+      }
+
+      renderAll();
+    }
+
+    // Live FX rates (per 1 USD). Fallback used offline; refreshed from open.er-api.com.
+    let FX_RATES = { USD: 1, MYR: 4.45, EUR: 0.92, GBP: 0.78, SGD: 1.34 };
+    let FX_LIVE = false;
+    async function refreshFxRates() {
+      try {
+        const res = await fetch('https://open.er-api.com/v6/latest/USD');
+        const data = await res.json();
+        if (data && data.rates) {
+          Object.keys(FX_RATES).forEach(k => { if (data.rates[k]) FX_RATES[k] = data.rates[k]; });
+          FX_LIVE = true;
+        }
+      } catch (e) { console.warn('FX rates offline, using fallback'); }
+    }
+    const fxReady = refreshFxRates();
+
+    function convertAmount(v, from, to) {
+      const n = Number(v) || 0;
+      if (from === to) return n;
+      return Math.round((n / FX_RATES[from]) * FX_RATES[to] * 100) / 100;
+    }
+
+    async function changeCurrency(curr) {
+      const from = state.currency;
+      if (from === curr) return;
+      await Promise.race([fxReady, new Promise(r => setTimeout(r, 2500))]);
+      FE.convertMoney(state, v => convertAmount(v, from, curr));
+      state.currency = curr;
+      saveState();
+      renderAll();
+      const rate = convertAmount(1, from, curr);
+      showToast(`Converted to ${curr} · 1 ${from} = ${rate.toFixed(rate < 1 ? 4 : 2)} ${curr}${FX_LIVE ? '' : ' (offline rate)'}`);
+    }
+
+    function handleGlobalSearch(val) {
+      globalSearchQuery = val.trim().toLowerCase();
+      document.getElementById('clearGlobalSearchBtn').classList.toggle('hidden', !globalSearchQuery);
+      renderAll();
+    }
+
+    function clearGlobalSearch() {
+      document.getElementById('globalSearchInput').value = '';
+      handleGlobalSearch('');
+    }
+
+    function togglePrivacyMask() {
+      privacyMasked = !privacyMasked;
+      renderOverview();
+    }
+
+    const HERO_MODES = ['cash', 'net', 'expected'];
+    function toggleHeroCardMetric() {
+      heroMetricMode = HERO_MODES[(HERO_MODES.indexOf(heroMetricMode) + 1) % HERO_MODES.length];
+      renderOverview();
+    }
+
+    // =========================================================================
+    // MASTER RENDERER
+    // =========================================================================
+
+    function renderAll() {
+      try { renderNotifications(); } catch (e) { console.warn(e); }
+      renderSoundToggle();
+      const sym = currencySymbol();
+      document.querySelectorAll('.currency-prefix-sym, .quick-sym').forEach(el => {
+        el.textContent = sym;
+      });
+
+      document.getElementById('currencySelect').value = state.currency;
+      document.getElementById('headerMonthLabel').textContent = formatMonthShort(state.activeMonth);
+      document.getElementById('jumpTodayBtn').classList.toggle('hidden', state.activeMonth === TODAY_MONTH_STR);
+      document.getElementById('userAvatarInitials').textContent = (state.userName || 'A').charAt(0).toUpperCase();
+      const restoreBtn = document.getElementById('downloadSafetyBackupBtn');
+      if (restoreBtn) restoreBtn.classList.toggle('hidden', listBackups().length === 0);
+
+      if (currentView === 'overview') {
+        renderOverview();
+      } else if (currentView === 'calendar') {
+        renderFullCalendarView();
+      } else {
+        renderCategoryTabView(currentView);
+      }
+    }
+
+    // =========================================================================
+    // VIEW 1: OVERVIEW DASHBOARD RENDERING
+    // =========================================================================
+
+    function renderOverview() {
+      const m = metricsFor(state.activeMonth);
+      const shortMon = formatMonthShort(state.activeMonth);
+      const longMon = formatMonthLong(state.activeMonth);
+
+      // 1. Black card — Cash Balance / Net Worth / End-of-Month Forecast (Switch metric)
+      document.getElementById('heroCardHolderName').textContent = state.userName || 'Alex';
+      const hero = heroMetricFor(m, heroMetricMode);
+      document.getElementById('heroCardModeTag').textContent = hero.tag;
+      document.getElementById('heroBalanceValue').textContent = privacyMasked ? '••••••••' : hero.value;
+
+      // 2. Accounts & Flow tiles
+      const pendingIn = FE.round2(m.pendingIncome + m.dailyPending);
+      document.getElementById('cardIncomeTotal').textContent = maskOr(`+${formatMoney(m.totalIncomeReceived)}`);
+      document.getElementById('cardIncomeSub').textContent = pendingIn > 0 ? `${formatMoney(pendingIn)} pending` : 'Received this month';
+
+      document.getElementById('cardSavingsTotal').textContent = maskOr(formatMoney(m.savingsAssets));
+      document.getElementById('cardSavingsSub').textContent = m.plannedSavings > 0
+        ? `${formatMoney(m.plannedSavings)} pending`
+        : `${m.activeSavingsCount} active ${m.activeSavingsCount === 1 ? 'asset' : 'assets'}`;
+
+      document.getElementById('cardDebtTotal').textContent = maskOr(formatMoney(m.liabilities));
+      document.getElementById('cardDebtSub').textContent = `${m.openDebts.length} open · ${formatMoney(m.debtPayments)} paid`;
+
+      document.getElementById('cardExpensesTotal').textContent = maskOr(formatMoney(m.spentPaid));
+      document.getElementById('cardExpensesSub').textContent = m.unpaidBills > 0 ? `${formatMoney(m.unpaidBills)} unpaid` : 'All bills paid';
+
+      // 3. Opening Cash + the two numbers not shown on the card
+      renderCashSummary(m);
+
+      // 4. Monthly Daily Earning Calendar Widget
+      const ds = FE.dailySummary(state, state.selectedDate);
+      const overviewCalendarMonthBadge = document.getElementById('overviewCalendarMonthBadge');
+      if (overviewCalendarMonthBadge) overviewCalendarMonthBadge.textContent = longMon;
+      document.getElementById('calendarMonthTotalPill').textContent = `Month Daily: +${formatMoney(m.dailyReceived)}`;
+      document.getElementById('calendarWeekTotalPill').textContent = `Week: +${formatMoney(ds.weekTotal)}`;
+      document.getElementById('calendarActiveDaysPill').textContent = `${ds.activeDays} Earning Day${ds.activeDays === 1 ? '' : 's'}`;
+
+      renderCalendarGrid('overviewCalendarGrid', false);
+      renderSelectedDayBar('overview');
+
+      // 5. Monthly Cash Flow list + recurring rules drawer
+      renderOverviewTransactions();
+
+      // 6. Right Elevated Analytics Panel (Wave Chart + Stacked Goal Card)
+      renderAnalyticsPanel(m);
+    }
+
+    function heroMetricFor(m, mode) {
+      const map = {
+        cash: { tag: 'Cash Balance', value: formatMoney(m.actualCash) },
+        net: { tag: 'Net Worth', value: formatMoney(m.netWorth) },
+        expected: { tag: 'EXPECTED INCOME', value: formatMoney(m.expectedCash) }
+      };
+      return map[mode] || map.cash;
+    }
+
+    function renderCashSummary(m) {
+      const el = document.getElementById('cashSummaryStrip');
+      if (!el) return;
+      const pendingIn = FE.round2(m.pendingIncome + m.dailyPending);
+      const pendingOut = FE.round2(m.unpaidBills + m.expectedDebtPayments);
+      const all = {
+        cash: { label: 'Cash Balance', value: formatMoney(m.actualCash), hint: 'Opening cash + received − paid' },
+        net: { label: 'Net Worth', value: formatMoney(m.netWorth), hint: `Cash + ${formatMoney(m.savingsAssets)} assets − ${formatMoney(m.liabilities)} debt` },
+        expected: { label: 'EXPECTED INCOME', value: formatMoney(m.expectedCash), hint: `Cash + ${formatMoney(pendingIn)} pending − ${formatMoney(pendingOut)} unpaid` }
+      };
+      // Never repeat the number already on the black card.
+      const items = [{ label: 'Opening Cash', value: formatMoney(m.openingCash), hint: 'Carried from last month' }]
+        .concat(HERO_MODES.filter(k => k !== heroMetricMode).map(k => all[k]));
+      el.innerHTML = items.map(x => `
+        <div class="bg-shell text-obsidian rounded-[18px] px-4 py-3 border border-black/[0.03] min-w-0">
+          <div class="text-[10.5px] font-bold uppercase tracking-wider text-muted">${x.label}</div>
+          <div class="text-[15px] font-extrabold tabular-nums truncate mt-0.5">${maskOr(x.value)}</div>
+          <div class="text-[10.5px] font-medium text-muted truncate" title="${privacyMasked ? '' : escapeHTML(x.hint)}">${privacyMasked ? '••••' : x.hint}</div>
+        </div>
+      `).join('');
+    }
+
+    // =========================================================================
+    // MONTHLY DAILY EARNING CALENDAR GRID & DAY INSPECTOR
+    // =========================================================================
+
+    function renderCalendarGrid(containerId, isExpanded) {
+      const container = document.getElementById(containerId);
+      if (!container) return;
+
+      const { year, monthIndex } = parseMonthStr(state.activeMonth);
+      const firstDay = new Date(year, monthIndex, 1);
+      const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+      const startWeekday = (firstDay.getDay() + 6) % 7; // Monday = 0
+      const totals = FE.dailyTotalsByDay(state, state.activeMonth);
+      const sym = currencySymbol();
+
+      let html = '';
+      for (let i = 0; i < startWeekday; i++) {
+        html += `<div class="${isExpanded ? 'min-h-[76px]' : 'min-h-[54px]'} rounded-2xl bg-white/40"></div>`;
+      }
+
+      for (let day = 1; day <= daysInMonth; day++) {
+        const ymd = `${state.activeMonth}-${String(day).padStart(2, '0')}`;
+        const slot = totals[ymd] || { received: 0, pending: 0 };
+        const isToday = ymd === TODAY_DATE_STR;
+        const isSelected = ymd === state.selectedDate;
+
+        const baseClasses = isExpanded
+          ? 'min-h-[78px] p-2.5 rounded-2xl'
+          : 'min-h-[54px] p-1.5 sm:p-2 rounded-2xl';
+
+        let stateClasses = 'bg-white hover:bg-[#ECEEF5] text-obsidian border border-black/[0.04]';
+        if (isSelected) {
+          stateClasses = 'bg-obsidian text-white shadow-sm ring-2 ring-obsidian/20';
+        } else if (slot.received > 0) {
+          stateClasses = 'bg-white hover:bg-[#ECEEF5] text-obsidian border border-[#1F7A4C]/25';
+        } else if (slot.pending > 0) {
+          stateClasses = 'bg-white hover:bg-[#ECEEF5] text-obsidian border border-[#A36A14]/25';
+        }
+
+        let amountHtml;
+        if (slot.received > 0) {
+          amountHtml = `<span class="mt-1 inline-block text-[10.5px] font-extrabold tabular-nums px-1.5 py-0.5 rounded-lg truncate max-w-full ${
+            isSelected ? 'bg-emerald-400/20 text-emerald-300' : 'bg-mint-bg text-mint-text'
+          }">+${formatMoney(slot.received, true)}</span>`;
+        } else {
+          amountHtml = `<span class="mt-1 text-[10px] font-bold tabular-nums ${isSelected ? 'text-white/50' : 'text-muted/70'}">${sym}0</span>`;
+        }
+        const pendingHtml = slot.pending > 0
+          ? `<span class="text-[9.5px] font-bold tabular-nums truncate max-w-full ${isSelected ? 'text-amber-300' : 'text-amberpill-text'}" title="Pending">⏳ ${formatMoney(slot.pending, true)}</span>`
+          : '';
+
+        html += `
+          <button
+            type="button"
+            onclick="selectCalendarDate('${ymd}')"
+            class="spring-btn ${baseClasses} ${stateClasses} flex flex-col items-start justify-between text-left transition relative"
+          >
+            <div class="w-full flex items-center justify-between">
+              <span class="text-[12px] font-extrabold tabular-nums leading-none">${day}</span>
+              ${isToday ? `<span class="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded-full ${isSelected ? 'bg-white/20 text-white' : 'bg-obsidian text-white'}">Today</span>` : ''}
+            </div>
+            <div class="flex flex-col items-start max-w-full">${amountHtml}${pendingHtml}</div>
+          </button>
+        `;
+      }
+
+      container.innerHTML = html;
+    }
+
+    function dailyEntryRowHTML(item, compact) {
+      const isPending = item.status === 'Pending';
+      const isDone = item.status === 'Completed';
+      const chip = isPending
+        ? '<span class="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amberpill-bg text-amberpill-text shrink-0">Pending</span>'
+        : '<span class="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-mint-bg text-mint-text shrink-0">Completed</span>';
+      const sub = isDone
+        ? `Received ${item.completedAt ? formatDayMon(item.completedAt) : ''}`
+        : item.sourceId ? `${item.time || ''} · from pending` : (item.time || 'Recorded');
+      const amountTone = isPending ? 'text-amberpill-text' : isDone ? 'text-muted line-through' : 'text-[#1F7A4C]';
+      const receiveBtn = isPending
+        ? `<button type="button" onclick="openSettleModal('daily', '${item.id}')" class="spring-btn text-[11px] font-bold px-2.5 py-1 rounded-full bg-obsidian text-white">Receive</button>`
+        : '';
+      return `
+        <div class="flex items-center justify-between gap-2 bg-white ${compact ? 'rounded-xl px-3.5 py-2 text-[12.5px]' : 'rounded-2xl px-3.5 py-2.5'} border border-black/[0.04] ${isDone ? 'opacity-70' : ''}">
+          <div class="min-w-0 flex items-center gap-2">
+            <span class="w-1.5 h-1.5 rounded-full ${isPending ? 'bg-[#A36A14]' : isDone ? 'bg-muted' : 'bg-[#1F7A4C]'} shrink-0"></span>
+            <div class="min-w-0">
+              <div class="flex items-center gap-1.5 min-w-0"><span class="${compact ? '' : 'text-[13px]'} font-bold text-obsidian truncate">${escapeHTML(item.note)}</span>${chip}</div>
+              <div class="text-[11px] text-muted truncate">${escapeHTML(sub)}</div>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 shrink-0">
+            <span class="font-extrabold tabular-nums ${amountTone}">+${formatMoney(item.amount)}</span>
+            ${receiveBtn}
+            <button type="button" onclick="deleteDailyEarning('${item.id}')" title="Delete entry" class="w-6 h-6 rounded-full hover:bg-rose-50 text-muted hover:text-rose-600 flex items-center justify-center text-xs">✕</button>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderSelectedDayBar(mode) {
+      const selectedEntries = state.dailyEarnings.filter(e => e.date === state.selectedDate && e.status !== 'Completed');
+      const ds = FE.dailySummary(state, state.selectedDate);
+      const dateText = formatFullDateLabel(state.selectedDate);
+      const badge = `+${formatMoney(ds.day)}${ds.dayPending > 0 ? ` · ${formatMoney(ds.dayPending)} pending` : ''}`;
+
+      if (mode === 'overview') {
+        document.getElementById('selectedDayBannerLabel').textContent = `Selected: ${dateText}`;
+        document.getElementById('selectedDayTotalBadge').textContent = badge;
+        const listEl = document.getElementById('overviewSelectedDayEntries');
+        listEl.innerHTML = selectedEntries.length === 0
+          ? `<div class="text-[11.5px] text-muted px-1">No earnings on ${dateText} (${formatMoney(0)}). Enter an amount above to record.</div>`
+          : selectedEntries.map(item => dailyEntryRowHTML(item, true)).join('');
+      } else {
+        document.getElementById('fullCalSelectedDateTitle').textContent = dateText;
+        document.getElementById('fullCalSelectedDayTotal').textContent = badge;
+        const listEl = document.getElementById('fullCalDayEntriesList');
+        listEl.innerHTML = selectedEntries.length === 0
+          ? `<div class="text-[12.5px] text-muted bg-white rounded-2xl p-4 text-center border border-black/[0.04]">No earnings recorded for this date — ${formatMoney(0)}.</div>`
+          : selectedEntries.map(item => dailyEntryRowHTML(item, false)).join('');
+      }
+    }
+
+    function bumpDailyEarningInput(delta, prefix) {
+      const input = document.getElementById(`${prefix}DailyAmount`);
+      if (!input) return;
+      const cur = parseFloat(input.value) || 0;
+      input.value = Math.round((cur + delta) * 100) / 100;
+      input.focus();
+    }
+
+    function handleRecordDailyEarning(event, prefix) {
+      event.preventDefault();
+      const amountEl = document.getElementById(`${prefix}DailyAmount`);
+      const noteEl = document.getElementById(`${prefix}DailyNote`);
+      const statusEl = document.getElementById(`${prefix}DailyStatus`);
+      const status = statusEl && statusEl.value === 'Pending' ? 'Pending' : 'Received';
+      const nowTime = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
+      const res = FE.addDailyEarning(state, {
+        date: state.selectedDate,
+        amount: parseFloat(amountEl.value),
+        note: noteEl.value,
+        status,
+        time: nowTime
+      });
+      if (!res.ok) { showToast(res.error); return; }
+
+      saveState();
+      amountEl.value = '';
+      noteEl.value = '';
+      renderAll();
+      if (status === 'Received') celebrateMoney('in', res.entry.amount);
+      showToast(`${status === 'Pending' ? 'Pending' : 'Recorded'} +${formatMoney(res.entry.amount)} on ${formatRowDate(state.selectedDate)}`);
+    }
+
+    function deleteDailyEarning(id) {
+      FE.deleteDailyEarning(state, id);
+      saveState();
+      renderAll();
+      showToast('Daily earning removed');
+    }
+
+    // =========================================================================
+    // RECENT TRANSACTION LIST & FLOATING DARK POPOVER
+    // =========================================================================
+
+    function setOverviewTxStatusFilter(status) {
+      overviewTxStatusFilter = status;
+      renderOverview();
+    }
+
+    function changeOverviewSort(mode) {
+      overviewSortMode = mode;
+      renderOverview();
+    }
+
+    function toggleAlphaSort() {
+      alphaAsc = !alphaAsc;
+      overviewSortMode = 'name';
+      document.getElementById('overviewSortSelect').value = 'name';
+      renderOverview();
+    }
+
+    function matchesSearch(r) {
+      if (!globalSearchQuery) return true;
+      return [r.name, r.category, r.status, r.kind].some(v => String(v || '').toLowerCase().includes(globalSearchQuery));
+    }
+
+    function matchesGroup(r, filter) {
+      return filter === 'all' || FE.simpleStatus(state, r).toLowerCase() === filter;
+    }
+
+    function sortRows(rows) {
+      const amt = r => Number(r.kind === 'debt' ? FE.debtInfo(state, r).remaining : r.amount) || 0;
+      if (overviewSortMode === 'amount_desc') rows.sort((a, b) => amt(b) - amt(a));
+      else if (overviewSortMode === 'amount_asc') rows.sort((a, b) => amt(a) - amt(b));
+      else if (overviewSortMode === 'name') rows.sort((a, b) => alphaAsc ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name));
+      else rows.sort((a, b) => FE.recordDate(b).localeCompare(FE.recordDate(a)));
+      return rows;
+    }
+
+    function renderStatusPills(selector, dataKey, current, activeCls, idleCls) {
+      document.querySelectorAll(selector).forEach(btn => {
+        btn.className = btn.dataset[dataKey] === current ? activeCls : idleCls;
+      });
+    }
+
+    function renderOverviewTransactions() {
+      renderStatusPills('.tx-status-pill', 'txStatus', overviewTxStatusFilter,
+        'tx-status-pill px-3 py-1 rounded-full text-[11.5px] font-bold bg-obsidian text-white transition',
+        'tx-status-pill px-3 py-1 rounded-full text-[11.5px] font-semibold bg-shell text-muted hover:text-obsidian transition');
+
+      const rows = sortRows(FE.cashFlowRecords(state, state.activeMonth)
+        .filter(r => matchesGroup(r, overviewTxStatusFilter))
+        .filter(matchesSearch));
+      renderRecurringRules();
+
+      const listEl = document.getElementById('overviewTransactionList');
+      if (rows.length === 0) {
+        listEl.innerHTML = `
+          <div class="py-8 text-center text-[13px] text-muted bg-shell/60 rounded-2xl mt-2">
+            No income or expenses for ${formatMonthShort(state.activeMonth)} yet. Click <strong>+ Add</strong> above to record one.
+          </div>
+        `;
+        return;
+      }
+      listEl.innerHTML = rows.map(item => renderTransactionRowHTML(item)).join('');
+    }
+
+    let recurringRulesOpen = false;
+    function toggleRecurringRules() {
+      recurringRulesOpen = !recurringRulesOpen;
+      renderRecurringRules();
+    }
+
+    function renderRecurringRules() {
+      const rules = sortRows(FE.recurringRules(state, state.activeMonth).filter(matchesSearch));
+      const btn = document.getElementById('recurringRulesBtn');
+      const drawer = document.getElementById('recurringRulesDrawer');
+      if (!btn || !drawer) return;
+      btn.textContent = `${recurringRulesOpen ? '▾' : '▸'} Recurring rules (${rules.length})`;
+      drawer.classList.toggle('hidden', !recurringRulesOpen);
+      if (!recurringRulesOpen) return;
+      drawer.innerHTML = `
+        <div class="flex flex-wrap items-center justify-between gap-2 px-1 mb-1">
+          <span class="text-[12.5px] font-extrabold text-obsidian">Recurring rules</span>
+          <span class="text-[11px] font-semibold text-muted">Each rule adds one Pending row per month to the list below.</span>
+        </div>
+        ${rules.length ? `<div class="divide-y divide-white">${rules.map(renderTransactionRowHTML).join('')}</div>`
+          : '<div class="text-[12px] text-muted px-1 py-2">No recurring rules. Add an entry with type “Scheduled”.</div>'}`;
+    }
+
+    function rowSubText(item) {
+      const parts = [];
+      if (FE.isTemplate(item)) {
+        parts.push(`Every month · day ${Number(String(item.date || '').slice(8, 10)) || 1}`);
+        if (item.debtId) { const d = FE.findRecord(state, item.debtId); if (d) parts.push(`toward ${d.name}`); }
+      } else if (item.status === 'Completed') {
+        const done = (FE.SETTLE_RULES[item.kind] || {}).done || 'Done';
+        parts.push(`${done}${item.completedAt ? ' ' + formatDayMon(item.completedAt) : ''} · kept as history`);
+      } else if (item.kind === 'debt') {
+        const info = FE.debtInfo(state, item);
+        parts.push(`Left of ${formatMoney(info.principal)} · ${info.payments.length} payment${info.payments.length === 1 ? '' : 's'}`);
+      } else {
+        const src = item.sourceId ? FE.findRecord(state, item.sourceId) : null;
+        if (item.templateId || (src && src.templateId)) parts.push('Monthly');
+        else if (src && src.kind === item.kind) parts.push(`Was pending · ${formatDayMon(FE.recordDate(src))}`);
+        if (item.budgetId) { const b = FE.findRecord(state, item.budgetId); parts.push(`Budget: ${b ? b.name : 'removed'}`); }
+        if (item.kind === 'debt_payment' && item.debtId) { const d = FE.findRecord(state, item.debtId); if (d) parts.push(`Toward ${d.name}`); }
+        if (item.kind === 'savings' && item.status === 'Active' && item.fromCash) parts.push('Moved from cash');
+      }
+      if (item.needsReview) parts.push('Please check: carried over from old version');
+      return parts.join(' · ');
+    }
+
+    function renderTransactionRowHTML(item) {
+      const catInfo = getCategoryIconInfo(item.category);
+      const statusBadge = getStatusPillStyle(item);
+      const isDebt = item.kind === 'debt';
+      const shownAmount = isDebt ? FE.debtInfo(state, item).remaining : item.amount;
+      const sign = item.kind === 'income' ? '+' : (item.kind === 'savings' || isDebt || item.kind === 'budget' ? '' : '-');
+      const done = item.status === 'Completed';
+      const amountTone = done ? 'text-muted line-through' : item.kind === 'income' ? 'text-[#1F7A4C]' : 'text-obsidian';
+      const sub = rowSubText(item);
+      const dateLabel = formatRowDate(FE.recordDate(item));
+
+      return `
+        <div class="py-3.5 px-2 hover:bg-shell/65 rounded-2xl flex items-center justify-between gap-3 transition ${done ? 'opacity-75' : ''}">
+          <div class="flex items-center gap-3.5 min-w-0 flex-1">
+            <div class="w-11 h-11 rounded-2xl bg-shell border border-black/[0.04] text-obsidian flex items-center justify-center shrink-0">
+              ${catInfo.svg}
+            </div>
+            <div class="min-w-0">
+              <div class="text-[14px] font-bold text-obsidian truncate">${escapeHTML(item.name)}</div>
+              ${sub ? `<div class="text-[11.5px] font-medium ${item.needsReview ? 'text-amberpill-text' : 'text-muted'} truncate mt-0.5">${escapeHTML(sub)}</div>` : ''}
+              <div class="text-[11.5px] font-medium text-muted sm:hidden mt-0.5">${dateLabel} · <span class="font-bold">${escapeHTML(statusLabel(item))}</span></div>
+            </div>
+          </div>
+
+          <div class="hidden sm:block text-[12px] font-medium text-muted tabular-nums shrink-0">
+            ${dateLabel}
+          </div>
+
+          <div class="shrink-0 hidden sm:block">
+            <button
+              type="button"
+              onclick="openRowPopover(event, '${item.id}')"
+              title="Actions for this entry"
+              class="spring-btn inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11.5px] font-bold ${statusBadge.classes}"
+            >
+              <span class="w-1.5 h-1.5 rounded-full ${statusBadge.dot}"></span>
+              <span>${escapeHTML(statusLabel(item))}</span>
+            </button>
+          </div>
+
+          <div class="flex items-center gap-2 sm:gap-3 shrink-0">
+            <span class="text-[14px] font-extrabold tabular-nums min-w-[76px] text-right ${amountTone}">
+              ${sign}${formatMoney(shownAmount)}
+            </span>
+            <button
+              type="button"
+              onclick="openRowPopover(event, '${item.id}')"
+              aria-label="Row actions"
+              class="w-7 h-7 rounded-full hover:bg-shell flex items-center justify-center text-muted hover:text-obsidian transition"
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+                <circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    // Only three status words: Pending, Completed, Scheduled.
+    function statusLabel(item) {
+      return FE.simpleStatus(state, item);
+    }
+    const SIMPLE_TONES = {
+      Pending: { classes: 'bg-amberpill-bg text-amberpill-text', dot: 'bg-[#A36A14]' },
+      Completed: { classes: 'bg-mint-bg text-mint-text', dot: 'bg-[#1F7A4C]' },
+      Scheduled: { classes: 'bg-skypill-bg text-skypill-text', dot: 'bg-[#3568B5]' }
+    };
+
+    function getCategoryIconInfo(cat) {
+      if (cat === 'income') {
+        return {
+          svg: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>`
+        };
+      }
+      if (cat === 'savings') {
+        return {
+          svg: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5.5" rx="8" ry="3"/><path d="M4 5.5v6.5c0 1.66 3.58 3 8 3s8-1.34 8-3V5.5"/><path d="M4 12v6.5c0 1.66 3.58 3 8 3s8-1.34 8-3V12"/></svg>`
+        };
+      }
+      if (cat === 'debt') {
+        return {
+          svg: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 2v20l2.33-1.5L9.67 22 12 20.5 14.33 22l2.34-1.5L19 22V2l-2.33 1.5L14.33 2 12 3.5 9.67 2 7.33 3.5z"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/></svg>`
+        };
+      }
+      return {
+        svg: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>`
+      };
+    }
+
+    function getStatusPillStyle(item) {
+      return SIMPLE_TONES[statusLabel(item)] || SIMPLE_TONES.Pending;
+    }
+
+    // Contextual actions for a row (replaces the old free status cycling, which
+    // could turn a pending item into cash without any real transaction).
+    function getRowActions(item) {
+      const acts = [];
+      const rule = FE.SETTLE_RULES[item.kind];
+      if (rule && item.status === rule.open) {
+        const label = { income: 'Mark Received', expense: 'Mark Paid', bill: 'Mark Paid', debt_payment: 'Mark Paid', savings: 'Mark Completed' }[item.kind];
+        acts.push({ label, icon: '✓', call: `popoverSettle('settle')` });
+      }
+      if (item.kind === 'debt' && !FE.isTemplate(item) && FE.debtInfo(state, item).remaining > 0) {
+        acts.push({ label: 'Record Payment', icon: '−', call: `popoverSettle('debt')` });
+      }
+      if (item.kind === 'budget') {
+        acts.push({ label: '+ Pay from Budget', icon: '+', call: `popoverSettle('budget')` });
+      }
+      if (item.kind === 'income' && item.status === 'Received' && !item.sourceId && !item.templateId) {
+        acts.push({ label: 'Move to Opening Cash', icon: '⇢', call: 'popoverMoveToOpening()' });
+      }
+      acts.push({ label: 'Edit Entry', icon: '✎', call: 'popoverEditEntry()' });
+      acts.push({ label: 'Delete Entry', icon: '✕', call: 'popoverDeleteEntry()', danger: true });
+      return acts;
+    }
+
+    function openRowPopover(event, recordId) {
+      event.stopPropagation();
+      const item = FE.findRecord(state, recordId);
+      if (!item) return;
+      activePopoverRecordId = recordId;
+      const popover = document.getElementById('rowActionPopover');
+      const acts = getRowActions(item);
+      document.getElementById('rowActionPopoverBody').innerHTML = acts.map((a, i) => `
+        ${i ? '<div class="border-t border-white/10"></div>' : ''}
+        <button type="button" onclick="${a.call}" class="w-full text-left px-4 py-3 ${a.danger ? 'hover:bg-rose-500/20 text-rose-300' : 'hover:bg-white/10'} flex items-center justify-between transition">
+          <span>${a.label}</span>
+          <span class="${a.danger ? '' : 'text-white/50'} text-[11px]">${a.icon}</span>
+        </button>
+      `).join('');
+      popover.classList.remove('hidden');
+
+      const rect = event.currentTarget.getBoundingClientRect();
+      const popWidth = 192;
+      const popHeight = acts.length * 45;
+      let left = rect.right - popWidth;
+      let top = rect.bottom + 6;
+      if (left < 12) left = 12;
+      if (top + popHeight > window.innerHeight - 12) top = rect.top - popHeight - 6;
+      popover.style.left = `${left}px`;
+      popover.style.top = `${Math.max(12, top)}px`;
+    }
+
+    function closeRowPopover() {
+      activePopoverRecordId = null;
+      const popover = document.getElementById('rowActionPopover');
+      if (popover) popover.classList.add('hidden');
+    }
+
+    function popoverSettle(mode) {
+      const id = activePopoverRecordId;
+      closeRowPopover();
+      if (id) openSettleModal(mode, id);
+    }
+
+    function popoverMoveToOpening() {
+      const id = activePopoverRecordId;
+      closeRowPopover();
+      const r = id && FE.findRecord(state, id);
+      if (!r) return;
+      const res = FE.moveIncomeToOpeningBalance(state, id);
+      if (!res.ok) { showToast(res.error); return; }
+      saveState();
+      renderAll();
+      showToast(`“${r.name}” is now opening cash (${formatMoney(res.openingBalance)}) — not counted as income`);
+    }
+
+    function popoverEditEntry() {
+      if (!activePopoverRecordId) return;
+      const item = FE.findRecord(state, activePopoverRecordId);
+      closeRowPopover();
+      if (item) openEntryModal(item);
+    }
+
+    function popoverDeleteEntry() {
+      if (!activePopoverRecordId) return;
+      FE.deleteRecord(state, activePopoverRecordId);
+      closeRowPopover();
+      saveState();
+      renderAll();
+      showToast('Entry deleted');
+    }
+
+    // =========================================================================
+    // RIGHT ELEVATED ANALYTICS PANEL: WAVE CHART & STACKED GOAL CARD
+    // =========================================================================
+
+    function setAnalyticsMetricMode(mode) {
+      state.analyticsMetric = mode;
+      saveState();
+      renderOverview();
+    }
+
+    function setAnalyticsTimeframe(tf) {
+      state.analyticsTimeframe = tf;
+      saveState();
+      renderOverview();
+    }
+
+    function metricValue(mm, mode) {
+      if (mode === 'daily') return mm.dailyReceived;
+      if (mode === 'networth') return mm.netWorth;
+      return mm.netCashFlow;
+    }
+
+    function renderAnalyticsPanel(currentMetrics) {
+      const mode = state.analyticsMetric || 'saved';
+      const tf = state.analyticsTimeframe || 'month';
+
+      document.getElementById('checkMetricSaved').classList.toggle('hidden', mode !== 'saved');
+      document.getElementById('checkMetricDaily').classList.toggle('hidden', mode !== 'daily');
+      document.getElementById('checkMetricNetworth').classList.toggle('hidden', mode !== 'networth');
+
+      const titles = { saved: 'Monthly Net Cash Flow', daily: 'Monthly Daily Earnings', networth: 'Net Worth' };
+      document.getElementById('analyticsMetricTitle').textContent = titles[mode];
+
+      const heroVal = metricValue(currentMetrics, mode);
+      document.getElementById('analyticsHeroFigure').textContent = privacyMasked ? '••••••••' : formatMoney(heroVal);
+
+      document.querySelectorAll('.tf-tab-btn').forEach(btn => {
+        const active = btn.dataset.tf === tf;
+        btn.className = active
+          ? 'tf-tab-btn font-extrabold text-obsidian transition'
+          : 'tf-tab-btn font-semibold text-muted hover:text-obsidian transition';
+      });
+
+      // 6-month window ending on the active month — real values only (no filler numbers).
+      const seriesPoints = [];
+      for (let offset = -5; offset <= 0; offset++) {
+        const ym = addMonthsToYM(state.activeMonth, offset);
+        const mm = offset === 0 ? currentMetrics : metricsFor(ym);
+        seriesPoints.push({ ym, label: formatShortMonthOnly(ym), value: metricValue(mm, mode) });
+      }
+
+      drawSmoothWaveChart(seriesPoints, tf);
+
+      document.getElementById('waveMonthAxis').innerHTML = seriesPoints.map(pt => {
+        const isActive = pt.ym === state.activeMonth;
+        return `
+          <button
+            type="button"
+            onclick="selectMonthDirect('${pt.ym}')"
+            class="spring-btn mx-auto px-2.5 py-1 rounded-full text-[11.5px] transition ${
+              isActive
+                ? 'bg-obsidian text-white font-extrabold shadow-xs'
+                : 'text-muted hover:text-obsidian font-semibold'
+            }"
+          >
+            ${pt.label}
+          </button>
+        `;
+      }).join('');
+
+      // Bottom stacked goal card
+      // Goal card = total savings & investments (e.g. Luno + ASB) vs the savings goal.
+      const target = Math.max(1, Number(state.monthlyGoalTarget) || 1);
+      const circumference = 2 * Math.PI * 28;
+      const saved = goalViewMonth ? metricsFor(goalViewMonth).savingsAssets : currentMetrics.savingsAssets;
+      const gp = FE.goalProgress(saved, target);
+      const gOffset = circumference * (1 - gp.pct / 100);
+      document.getElementById('goalCardMonthTitle').textContent = `Savings goal · ${formatMonthShort(goalViewMonth || state.activeMonth)}`;
+      document.getElementById('goalCardStatusText').textContent = gp.pct >= 100 ? 'Goal reached' : 'Total savings';
+      document.getElementById('goalCardSubAmount').textContent = privacyMasked ? '•••• / ••••' : `${formatMoney(saved, true)} / ${formatMoney(target, true)}`;
+      document.getElementById('goalRingPctLabel').textContent = gp.label;
+      document.getElementById('goalRingArc').setAttribute('stroke-dashoffset', gOffset.toFixed(2));
+    }
+    /**
+     * Renders the sculptural monochromatic wave SVG chart with smooth cubic bezier
+     * curves, vertical gradient fill, and an active indicator dot + drop line.
+     */
+    function drawSmoothWaveChart(points, timeframe) {
+      const svg = document.getElementById('analyticsWaveSvg');
+      if (!svg || points.length === 0) return;
+
+      const W = 360;
+      const H = 220;
+      const padX = 24;
+      const padTop = 26;
+      const padBottom = 18;
+      const plotW = W - padX * 2;
+      const plotH = H - padTop - padBottom;
+
+      const rawVals = points.map(p => p.value);
+      const maxV = Math.max(100, ...rawVals) * 1.15;
+      const minV = Math.min(0, ...rawVals);
+      const span = Math.max(1, maxV - minV);
+
+      const tfAmplitude = timeframe === 'day' ? 0.78 : timeframe === 'week' ? 0.9 : timeframe === 'year' ? 1.05 : 1.0;
+
+      const coords = [];
+      for (let i = 0; i < points.length; i++) {
+        const x = padX + (i / (points.length - 1)) * plotW;
+        const norm = ((points[i].value - minV) / span) * tfAmplitude;
+        const y = padTop + plotH - Math.max(0.15, Math.min(0.95, norm)) * plotH;
+        coords.push({ x, y, ym: points[i].ym, value: points[i].value });
+
+        if (i < points.length - 1) {
+          const midX = x + plotW / (points.length - 1) / 2;
+          const nextNorm = ((points[i + 1].value - minV) / span) * tfAmplitude;
+          const dipFactor = i % 2 === 0 ? 0.62 : 1.12;
+          const midNorm = Math.max(0.12, Math.min(0.92, ((norm + nextNorm) / 2) * dipFactor));
+          const midY = padTop + plotH - midNorm * plotH;
+          coords.push({ x: midX, y: midY, isMid: true });
+        }
+      }
+
+      let pathD = `M ${coords[0].x.toFixed(1)} ${coords[0].y.toFixed(1)}`;
+      for (let i = 0; i < coords.length - 1; i++) {
+        const p0 = coords[i === 0 ? i : i - 1];
+        const p1 = coords[i];
+        const p2 = coords[i + 1];
+        const p3 = coords[i + 2 < coords.length ? i + 2 : i + 1];
+
+        const cp1x = p1.x + (p2.x - p0.x) / 6;
+        const cp1y = p1.y + (p2.y - p0.y) / 6;
+        const cp2x = p2.x - (p3.x - p1.x) / 6;
+        const cp2y = p2.y - (p3.y - p1.y) / 6;
+
+        pathD += ` C ${cp1x.toFixed(1)} ${cp1y.toFixed(1)}, ${cp2x.toFixed(1)} ${cp2y.toFixed(1)}, ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`;
+      }
+
+      const areaD = `${pathD} L ${coords[coords.length - 1].x.toFixed(1)} ${H} L ${coords[0].x.toFixed(1)} ${H} Z`;
+      const activeNode = coords.find(c => c.ym === state.activeMonth) || coords[coords.length - 1];
+
+      svg.innerHTML = `
+        <defs>
+          <linearGradient id="waveShade" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#18191D" stop-opacity="0.14"/>
+            <stop offset="85%" stop-color="#18191D" stop-opacity="0.01"/>
+            <stop offset="100%" stop-color="#18191D" stop-opacity="0"/>
+          </linearGradient>
+        </defs>
+
+        <!-- Vertical gradient fill under wave -->
+        <path d="${areaD}" fill="url(#waveShade)" />
+
+        <!-- Thick obsidian wave line -->
+        <path d="${pathD}" fill="none" stroke="#18191D" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" />
+
+        <!-- Vertical drop line to active month pill -->
+        <line x1="${activeNode.x.toFixed(1)}" y1="${activeNode.y.toFixed(1)}" x2="${activeNode.x.toFixed(1)}" y2="${H}" stroke="#18191D" stroke-opacity="0.28" stroke-width="1.3" />
+
+        <!-- Active month white dot with thick obsidian ring -->
+        <circle cx="${activeNode.x.toFixed(1)}" cy="${activeNode.y.toFixed(1)}" r="5.5" fill="#FFFFFF" stroke="#18191D" stroke-width="3" />
+      `;
+    }
+
+
+    // =========================================================================
+    // DEDICATED SIDE TABS: SAVINGS, DEBT, EXPENSES, INCOME
+    // =========================================================================
+
+    function setCategoryTabStatusFilter(status) {
+      categoryTabStatusFilter = status;
+      renderCategoryTabView(currentView);
+    }
+
+    function setCategoryScope(scope) {
+      categoryTabScope = scope;
+      renderCategoryTabView(currentView);
+    }
+
+    function fillTypeSelect(selectEl, cat, includeAll) {
+      const opts = TYPE_OPTIONS[cat] || [];
+      selectEl.innerHTML = opts.map((o, i) => `<option value="${i}">${o.label}</option>`).join('');
+    }
+
+    function renderCategoryTabView(cat) {
+      const m = metricsFor(state.activeMonth);
+      const longMon = formatMonthLong(state.activeMonth);
+
+      const metaMap = {
+        savings: {
+          title: 'Savings & Assets',
+          subtitle: 'Balances you hold. They count in Net Worth, not as income or cash.',
+          totalLabel: 'Savings Assets',
+          totalVal: formatMoney(m.savingsAssets),
+          extraLabel: 'Pending This Month',
+          extraVal: formatMoney(m.plannedSavings),
+          extraSub: `${formatMoney(m.savingsTransfers)} moved from cash`,
+          icon: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5.5" rx="8" ry="3"/><path d="M4 5.5v6.5c0 1.66 3.58 3 8 3s8-1.34 8-3V5.5"/><path d="M4 12v6.5c0 1.66 3.58 3 8 3s8-1.34 8-3V12"/></svg>`
+        },
+        debt: {
+          title: 'Debt & Liabilities',
+          subtitle: 'Balances you owe. Cash only goes down when you record a payment.',
+          totalLabel: 'Remaining Liabilities',
+          totalVal: formatMoney(m.liabilities),
+          extraLabel: 'Paid This Month',
+          extraVal: formatMoney(m.debtPayments),
+          extraSub: `${formatMoney(m.expectedDebtPayments)} instalments still due`,
+          icon: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 2v20l2.33-1.5L9.67 22 12 20.5 14.33 22l2.34-1.5L19 22V2l-2.33 1.5L14.33 2 12 3.5 9.67 2 7.33 3.5z"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/></svg>`
+        },
+        expenses: {
+          title: 'Expenses, Bills & Budgets',
+          subtitle: 'Bills, budgets and spending. Only paid items reduce your cash.',
+          totalLabel: 'Spent This Month',
+          totalVal: formatMoney(m.spentPaid),
+          extraLabel: 'Unpaid Bills',
+          extraVal: formatMoney(m.unpaidBills),
+          extraSub: `Budgets: ${formatMoney(m.budgetSpentTotal)} of ${formatMoney(m.budgetLimitTotal)}`,
+          icon: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="3"/><line x1="2" y1="10" x2="22" y2="10"/></svg>`
+        },
+        income: {
+          title: 'Income & Daily Earnings',
+          subtitle: 'Salaries, retainers and daily earnings. Only received money counts as cash.',
+          totalLabel: 'Received + Daily',
+          totalVal: `+${formatMoney(m.totalIncomeReceived)}`,
+          extraLabel: 'Month Daily Earnings',
+          extraVal: `+${formatMoney(m.dailyReceived)}`,
+          extraSub: `${formatMoney(m.pendingIncome + m.dailyPending)} pending`,
+          icon: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>`
+        }
+      };
+
+      const meta = metaMap[cat] || metaMap.savings;
+      document.getElementById('catTabHeroIcon').innerHTML = meta.icon;
+      document.getElementById('catTabTitle').textContent = meta.title;
+      document.getElementById('catTabSubtitle').textContent = meta.subtitle;
+      const catBadge = document.getElementById('catTabMonthBadge'); if (catBadge) catBadge.textContent = longMon;
+      document.getElementById('catTabTotalLabel').textContent = meta.totalLabel;
+      document.getElementById('catTabTotalValue').textContent = meta.totalVal;
+
+      document.getElementById('catTabDailyExtraBox').classList.remove('hidden');
+      document.getElementById('catTabDailyExtraLabel').textContent = meta.extraLabel;
+      document.getElementById('catTabDailyExtraValue').textContent = meta.extraVal;
+      document.getElementById('catTabDailyExtraValue').className = `text-[17px] font-extrabold tabular-nums ${cat === 'income' ? 'text-[#1F7A4C]' : 'text-obsidian'}`;
+      document.getElementById('catTabDailyExtraSub').textContent = meta.extraSub;
+
+      // Quick-add bar: entry types for this category; date defaults to the selected day.
+      const typeSel = document.getElementById('catQuickStatus');
+      if (quickAddCategory !== cat) {
+        fillTypeSelect(typeSel, cat);
+        quickAddCategory = cat;
+      }
+      const dateEl = document.getElementById('catQuickDate');
+      if (!dateEl.value || !dateEl.value.startsWith(state.activeMonth)) dateEl.value = state.selectedDate;
+
+      renderStatusPills('.cat-status-pill', 'catStatus', categoryTabStatusFilter,
+        'cat-status-pill px-3.5 py-1.5 rounded-full text-[12px] font-bold bg-obsidian text-white',
+        'cat-status-pill px-3.5 py-1.5 rounded-full text-[12px] font-semibold bg-shell text-muted hover:text-obsidian');
+
+      const scopeMonthBtn = document.getElementById('scopeMonthBtn');
+      const scopeAllBtn = document.getElementById('scopeAllBtn');
+      if (categoryTabScope === 'month') {
+        scopeMonthBtn.className = 'px-3.5 py-1 rounded-full bg-white text-obsidian shadow-xs transition';
+        scopeAllBtn.className = 'px-3.5 py-1 rounded-full text-muted hover:text-obsidian transition';
+      } else {
+        scopeAllBtn.className = 'px-3.5 py-1 rounded-full bg-white text-obsidian shadow-xs transition';
+        scopeMonthBtn.className = 'px-3.5 py-1 rounded-full text-muted hover:text-obsidian transition';
+      }
+
+      renderBudgetsPanel(cat === 'expenses' ? m : null);
+
+      let items = categoryTabScope === 'month'
+        ? FE.monthRecords(state, state.activeMonth).filter(r => r.category === cat)
+        : state.records.filter(r => r.category === cat && r.kind !== 'budget');
+      // Recurring rules only under "Scheduled"; a completed pending item is shown once, by its actual transaction.
+      items = categoryTabStatusFilter === 'scheduled'
+        ? items.filter(r => FE.isTemplate(r))
+        : items.filter(r => !FE.isTemplate(r) && r.status !== 'Completed' && matchesGroup(r, categoryTabStatusFilter));
+      items = sortRows(items.filter(matchesSearch));
+
+      const listEl = document.getElementById('categoryTabItemsList');
+      if (items.length === 0) {
+        listEl.innerHTML = `
+          <div class="py-10 text-center text-[13.5px] text-muted bg-shell/60 rounded-2xl">
+            No ${meta.title.toLowerCase()} entries match your filter. Add one using the bar above.
+          </div>
+        `;
+        return;
+      }
+
+      listEl.innerHTML = items.map(item => {
+        let html = renderTransactionRowHTML(item);
+        if (item.kind === 'debt' && !FE.isTemplate(item)) html += debtHistoryHTML(item);
+        return html;
+      }).join('');
+    }
+
+    function debtHistoryHTML(debt) {
+      const info = FE.debtInfo(state, debt);
+      const pct = info.principal > 0 ? Math.min(100, Math.round((info.paid / info.principal) * 100)) : 0;
+      const chips = info.payments.length
+        ? info.payments.map(p => `<span class="text-[11px] font-bold tabular-nums px-2 py-0.5 rounded-full bg-shell text-obsidian">${formatDayMon(FE.recordDate(p))} · -${formatMoney(p.amount)}</span>`).join('')
+        : '<span class="text-[11px] text-muted">No payments yet</span>';
+      return `
+        <div class="pl-[70px] pr-2 pb-3 -mt-1 flex flex-col gap-1.5">
+          <div class="flex items-center gap-2">
+            <div class="h-1.5 flex-1 max-w-[260px] bg-shell rounded-full overflow-hidden"><div class="h-full bg-obsidian rounded-full" style="width:${pct}%"></div></div>
+            <span class="text-[11px] font-bold text-muted tabular-nums">${formatMoney(info.paid)} paid of ${formatMoney(info.principal)}</span>
+          </div>
+          <div class="flex flex-wrap items-center gap-1.5"><span class="text-[10.5px] font-bold uppercase tracking-wider text-muted mr-1">History</span>${chips}</div>
+        </div>
+      `;
+    }
+
+    function renderBudgetsPanel(m) {
+      const panel = document.getElementById('catBudgetsPanel');
+      if (!panel) return;
+      if (!m) { panel.classList.add('hidden'); return; }
+      panel.classList.remove('hidden');
+      const cards = m.budgets.filter(b => matchesSearch(b.budget));
+      const body = cards.length === 0
+        ? `<div class="py-6 text-center text-[13px] text-muted bg-white rounded-2xl border border-black/[0.04]">No budgets for ${formatMonthShort(state.activeMonth)}. Add one with the type “Budget”.</div>`
+        : `<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">${cards.map(b => {
+            const over = b.remaining < 0;
+            const pct = Math.max(0, Math.min(100, b.pct));
+            return `
+              <div class="bg-white rounded-[20px] p-4 border border-black/[0.04] flex flex-col gap-3">
+                <div class="flex items-start justify-between gap-2">
+                  <div class="min-w-0">
+                    <div class="text-[14px] font-extrabold text-obsidian truncate">${escapeHTML(b.budget.name)}</div>
+                    <div class="text-[11px] font-semibold text-muted">${b.budget.status === 'Recurring' ? 'Every month' : 'This month only'}</div>
+                  </div>
+                  <button type="button" onclick="openRowPopover(event, '${b.budget.id}')" aria-label="Budget actions" class="w-7 h-7 rounded-full hover:bg-shell flex items-center justify-center text-muted hover:text-obsidian shrink-0">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
+                  </button>
+                </div>
+                <div class="grid grid-cols-3 gap-2 text-center">
+                  <div class="bg-shell rounded-xl py-1.5"><div class="text-[10px] font-bold uppercase tracking-wider text-muted">Budget</div><div class="text-[12.5px] font-extrabold tabular-nums text-obsidian">${formatMoney(b.limit)}</div></div>
+                  <div class="bg-shell rounded-xl py-1.5"><div class="text-[10px] font-bold uppercase tracking-wider text-muted">Spent</div><div class="text-[12.5px] font-extrabold tabular-nums text-obsidian">${formatMoney(b.spent)}</div></div>
+                  <div class="bg-shell rounded-xl py-1.5"><div class="text-[10px] font-bold uppercase tracking-wider text-muted">Remaining</div><div class="text-[12.5px] font-extrabold tabular-nums ${over ? 'text-rose-600' : 'text-[#1F7A4C]'}">${formatMoney(b.remaining)}</div></div>
+                </div>
+                <div class="flex items-center gap-2">
+                  <div class="h-2 flex-1 bg-shell rounded-full overflow-hidden"><div class="h-full rounded-full ${over ? 'bg-rose-500' : 'bg-obsidian'}" style="width:${pct}%"></div></div>
+                  <span class="text-[11px] font-bold tabular-nums ${over ? 'text-rose-600' : 'text-muted'}">${b.pct}%</span>
+                </div>
+                <button type="button" onclick="openSettleModal('budget', '${b.budget.id}')" class="spring-btn bg-obsidian hover:bg-[#2A2C33] text-white text-[12.5px] font-bold rounded-2xl py-2">+ Pay</button>
+              </div>
+            `;
+          }).join('')}</div>`;
+      panel.innerHTML = `
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+          <h3 class="text-[16px] font-extrabold text-obsidian tracking-tight">Monthly Budgets</h3>
+          <span class="text-[11.5px] font-semibold text-muted">Budgets are limits. Use + Pay to record real spending.</span>
+        </div>
+        ${body}
+      `;
+    }
+
+    function handleCategoryTabQuickAdd(event) {
+      event.preventDefault();
+      const opt = (TYPE_OPTIONS[currentView] || [])[Number(document.getElementById('catQuickStatus').value) || 0];
+      if (!opt) return;
+      const res = FE.addRecord(state, {
+        kind: opt.kind,
+        status: opt.status,
+        name: document.getElementById('catQuickTitle').value,
+        amount: parseFloat(document.getElementById('catQuickAmount').value),
+        date: document.getElementById('catQuickDate').value || state.selectedDate,
+        fromCash: false
+      });
+      if (!res.ok) { showToast(res.error); return; }
+      const quickDelta = FE.cashDelta(res.record);
+      ensureRecurring();
+      saveState();
+      if (quickDelta) celebrateMoney(quickDelta > 0 ? 'in' : 'out', Math.abs(quickDelta));
+      document.getElementById('catQuickTitle').value = '';
+      document.getElementById('catQuickAmount').value = '';
+      renderAll();
+      showToast(`Added ${res.record.name}`);
+    }
+
+    // =========================================================================
+    // VIEW 6: EXPANDED DAILY CALENDAR TAB
+    // =========================================================================
+
+    function renderFullCalendarView() {
+      const m = metricsFor(state.activeMonth);
+      const ds = FE.dailySummary(state, state.selectedDate);
+      const longMon = formatMonthLong(state.activeMonth);
+      const avgDaily = ds.activeDays > 0 ? m.dailyReceived / ds.activeDays : 0;
+
+      const fullCalMonthBadge = document.getElementById('fullCalMonthBadge');
+      if (fullCalMonthBadge) fullCalMonthBadge.textContent = longMon;
+      document.getElementById('fullCalMonthTotal').textContent = `Month Total: +${formatMoney(m.dailyReceived)}`;
+      document.getElementById('fullCalWeekTotal').textContent = `Week: +${formatMoney(ds.weekTotal)}`;
+      document.getElementById('fullCalAvgDaily').textContent = `Avg / Active Day: ${formatMoney(avgDaily)}`;
+
+      renderCalendarGrid('fullCalendarGrid', true);
+      renderSelectedDayBar('full');
+    }
+
+    // =========================================================================
+    // MODALS (ADD/EDIT ENTRY, COMPLETE/PAY, PROFILE)
+    // =========================================================================
+
+    function openEntryModal(editItem = null) {
+      document.getElementById('modalEditId').value = editItem ? editItem.id : '';
+      document.getElementById('entryModalTitle').textContent = editItem ? 'Edit Entry' : 'Add Financial Entry';
+      document.getElementById('modalErrorText').classList.add('hidden');
+      modalTypeLocked = false;
+
+      if (editItem) {
+        const cat = editItem.category && TYPE_OPTIONS[editItem.category] ? editItem.category : 'expenses';
+        setModalCategory(cat, true);
+        const opts = TYPE_OPTIONS[cat];
+        let idx = opts.findIndex(o => o.kind === editItem.kind && (o.status === editItem.status || (o.kind === 'debt') || (o.kind === 'budget')));
+        if (idx < 0) idx = opts.findIndex(o => o.kind === editItem.kind);
+        setModalType(Math.max(0, idx));
+        modalTypeLocked = FE.isTypeLocked(state, editItem) || editItem.status === 'Completed';
+        document.getElementById('modalTitleInput').value = editItem.name;
+        document.getElementById('modalAmountInput').value = editItem.kind === 'debt' ? (editItem.principal ?? editItem.amount) : editItem.amount;
+        document.getElementById('modalDateInput').value = FE.recordDate(editItem);
+        document.getElementById('modalBudgetRepeat').checked = editItem.kind === 'budget' && editItem.status === 'Recurring';
+        document.getElementById('modalFromCash').checked = !!editItem.fromCash;
+        refreshDebtLinkSelect(editItem.debtId || '');
+      } else {
+        setModalCategory(currentView !== 'overview' && currentView !== 'calendar' ? currentView : 'income', true);
+        setModalType(0);
+        document.getElementById('modalTitleInput').value = '';
+        document.getElementById('modalAmountInput').value = '';
+        document.getElementById('modalDateInput').value = state.selectedDate;
+        document.getElementById('modalBudgetRepeat').checked = true;
+        document.getElementById('modalFromCash').checked = false;
+        refreshDebtLinkSelect('');
+      }
+      updateModalLockState();
+      document.getElementById('entryModalBackdrop').classList.remove('hidden');
+    }
+
+    function closeEntryModal() {
+      document.getElementById('entryModalBackdrop').classList.add('hidden');
+    }
+
+    function setModalCategory(cat, force) {
+      if (modalTypeLocked && !force) return;
+      modalCategory = cat;
+      document.querySelectorAll('.m-cat-btn').forEach(btn => {
+        const active = btn.dataset.mCat === cat;
+        btn.className = active
+          ? 'm-cat-btn py-1.5 rounded-xl bg-obsidian text-white transition'
+          : 'm-cat-btn py-1.5 rounded-xl text-muted hover:text-obsidian transition';
+      });
+      const opts = TYPE_OPTIONS[cat];
+      const group = document.getElementById('modalStatusGroup');
+      group.className = `grid ${opts.length === 4 ? 'grid-cols-4' : 'grid-cols-3'} bg-shell p-1 rounded-2xl text-[12px] font-bold`;
+      group.innerHTML = opts.map((o, i) => `<button type="button" data-m-type="${i}" onclick="setModalType(${i})" class="m-status-btn py-1.5 rounded-xl text-muted transition">${o.label}</button>`).join('');
+      setModalType(0, true);
+    }
+
+    function setModalType(idx, force) {
+      if (modalTypeLocked && !force) return;
+      modalTypeIdx = idx;
+      const opt = TYPE_OPTIONS[modalCategory][idx];
+      document.querySelectorAll('.m-status-btn').forEach(btn => {
+        const active = Number(btn.dataset.mType) === idx;
+        if (!active) {
+          btn.className = 'm-status-btn py-1.5 rounded-xl text-muted hover:text-obsidian transition';
+        } else {
+          const g = { Received: 'Completed', Paid: 'Completed', Active: 'Completed', Recurring: 'Scheduled', Budget: 'Scheduled' }[opt.status] || 'Pending';
+          const tone = SIMPLE_TONES[g].classes;
+          btn.className = `m-status-btn py-1.5 rounded-xl ${tone} transition`;
+        }
+      });
+      document.getElementById('modalBudgetRepeatWrap').classList.toggle('hidden', opt.kind !== 'budget');
+      document.getElementById('modalFromCashWrap').classList.toggle('hidden', opt.kind !== 'savings' || opt.status === 'Planned');
+      document.getElementById('modalDebtLinkWrap').classList.toggle('hidden', opt.kind !== 'debt_payment');
+      const hints = {
+        Received: 'Completed — money already received, adds to cash. (A bank balance you already had? Use Opening Cash instead.)',
+        Pending: 'Pending — not received yet, does not affect cash.',
+        Recurring: 'Scheduled — repeats every month. Each month gets one Pending row to complete.',
+        Paid: 'Completed — already paid, reduces cash.',
+        Unpaid: 'Pending — not paid yet, does not affect cash.',
+        Budget: 'A spending limit — never counted as an expense.',
+        Outstanding: 'A balance you owe (e.g. Atome, card). Shown under Balances and in Net Worth, not as a transaction.',
+        Active: 'A balance you hold. Shown under Balances and in Net Worth, not as income.',
+        Planned: 'Pending — savings you plan to move; no effect until completed.'
+      };
+      document.getElementById('modalTypeHint').textContent = hints[opt.status] || '';
+      document.getElementById('modalDateLabel').textContent = opt.status === 'Recurring' ? 'Starts on' : (opt.kind === 'budget' ? 'Month (any day)' : 'Date');
+      document.getElementById('modalAmountLabel').textContent = opt.kind === 'debt' ? 'Original amount' : opt.kind === 'budget' ? 'Monthly limit' : 'Amount';
+    }
+
+    function updateModalLockState() {
+      document.getElementById('modalLockNote').classList.toggle('hidden', !modalTypeLocked);
+      document.querySelectorAll('.m-cat-btn, .m-status-btn').forEach(btn => {
+        btn.disabled = modalTypeLocked;
+        btn.classList.toggle('opacity-50', modalTypeLocked && !btn.className.includes('bg-'));
+      });
+    }
+
+    function refreshDebtLinkSelect(selectedId) {
+      const sel = document.getElementById('modalDebtLink');
+      const debts = state.records.filter(r => r.kind === 'debt' && !FE.isTemplate(r));
+      sel.innerHTML = '<option value="">Not linked to a debt</option>' + debts.map(d => {
+        const info = FE.debtInfo(state, d);
+        return `<option value="${d.id}" ${d.id === selectedId ? 'selected' : ''}>${escapeHTML(d.name)} · ${formatMoney(info.remaining)} left</option>`;
+      }).join('');
+    }
+
+    function showModalError(id, msg) {
+      const el = document.getElementById(id);
+      el.textContent = msg;
+      el.classList.remove('hidden');
+    }
+
+    function saveEntryModalForm(event) {
+      event.preventDefault();
+      const editId = document.getElementById('modalEditId').value;
+      const opt = TYPE_OPTIONS[modalCategory][modalTypeIdx];
+      let status = opt.status;
+      if (opt.kind === 'budget' && document.getElementById('modalBudgetRepeat').checked) status = 'Recurring';
+      const payload = {
+        kind: opt.kind,
+        status,
+        name: document.getElementById('modalTitleInput').value,
+        amount: parseFloat(document.getElementById('modalAmountInput').value),
+        date: document.getElementById('modalDateInput').value,
+        fromCash: document.getElementById('modalFromCash').checked,
+        debtId: opt.kind === 'debt_payment' ? (document.getElementById('modalDebtLink').value || undefined) : undefined
+      };
+
+      let res;
+      if (editId) {
+        const item = FE.findRecord(state, editId);
+        if (!item) return closeEntryModal();
+        if (modalTypeLocked) { payload.kind = item.kind; payload.status = item.kind === 'budget' ? payload.status : item.status; }
+        res = FE.updateRecord(state, editId, payload);
+        if (res.ok) {
+          delete res.record.needsReview;
+          if (FE.isTemplate(res.record)) FE.syncTemplateInstances(state, editId, TODAY_MONTH_STR);
+        }
+      } else {
+        res = FE.addRecord(state, payload);
+      }
+      if (!res.ok) { showModalError('modalErrorText', res.error); return; }
+      const newDelta = editId ? 0 : FE.cashDelta(res.record);
+
+      ensureRecurring();
+      saveState();
+      closeEntryModal();
+      renderAll();
+      if (newDelta) celebrateMoney(newDelta > 0 ? 'in' : 'out', Math.abs(newDelta));
+      showToast(editId ? 'Entry updated' : 'Entry saved');
+    }
+
+    // ---- Complete / pay modal ------------------------------------------------
+    function openSettleModal(mode, id) {
+      const cfg = { title: '', desc: '', amount: '', date: TODAY_DATE_STR, showName: false, showFromCash: false, submit: 'Save', max: null };
+      if (mode === 'settle') {
+        const r = FE.findRecord(state, id);
+        if (!r) return;
+        const titles = { income: 'Mark Received', expense: 'Mark Paid', bill: 'Mark Paid', debt_payment: 'Mark Paid', savings: 'Complete Savings' };
+        cfg.title = titles[r.kind] || 'Complete Entry';
+        cfg.desc = r.kind === 'income'
+          ? `“${r.name}” becomes Completed and is added to your cash on the date below.`
+          : r.kind === 'savings'
+            ? `“${r.name}” becomes a savings balance on the date below.`
+            : `“${r.name}” becomes Completed and is taken from your cash on the date below.`;
+        cfg.amount = r.amount;
+        cfg.date = defaultSettleDate(FE.recordDate(r));
+        cfg.showFromCash = r.kind === 'savings';
+        cfg.fromCash = r.fromCash !== false;
+        cfg.submit = r.kind === 'income' ? 'Mark Received' : r.kind === 'savings' ? 'Complete' : 'Mark Paid';
+        if (r.kind === 'debt_payment' && r.debtId) {
+          const d = FE.findRecord(state, r.debtId);
+          if (d) { const info = FE.debtInfo(state, d); cfg.desc += ` ${formatMoney(info.remaining)} left on ${d.name}.`; cfg.max = info.remaining; }
+        }
+      } else if (mode === 'debt') {
+        const d = FE.findRecord(state, id);
+        if (!d) return;
+        const info = FE.debtInfo(state, d);
+        cfg.title = 'Record Debt Payment';
+        cfg.desc = `${formatMoney(info.remaining)} left of ${formatMoney(info.principal)} on “${d.name}”. Pay part or all of it — cash goes down once, by this payment.`;
+        cfg.amount = info.remaining;
+        cfg.max = info.remaining;
+        cfg.date = state.selectedDate <= TODAY_DATE_STR ? (state.activeMonth === TODAY_MONTH_STR ? TODAY_DATE_STR : state.selectedDate) : TODAY_DATE_STR;
+        cfg.submit = 'Record Payment';
+      } else if (mode === 'budget') {
+        const b = FE.findRecord(state, id);
+        if (!b) return;
+        const bm = metricsFor(state.activeMonth).budgets.find(x => x.budget.id === id);
+        cfg.title = `+ Pay · ${b.name}`;
+        cfg.desc = bm ? `${formatMoney(bm.remaining)} left of ${formatMoney(bm.limit)} this month. This records real spending and reduces cash.` : 'Records real spending against this budget.';
+        cfg.showName = true;
+        cfg.date = state.activeMonth === TODAY_MONTH_STR ? TODAY_DATE_STR : state.selectedDate;
+        cfg.submit = 'Record Spending';
+      } else if (mode === 'daily') {
+        const e = state.dailyEarnings.find(x => x.id === id);
+        if (!e) return;
+        cfg.title = 'Receive Daily Earning';
+        cfg.desc = `“${e.note}” becomes Completed and is added to your cash on the date below.`;
+        cfg.amount = e.amount;
+        cfg.date = defaultSettleDate(e.date);
+        cfg.submit = 'Mark Received';
+      } else {
+        return;
+      }
+      settleCtx = { mode, id };
+      document.getElementById('settleModalTitle').textContent = cfg.title;
+      document.getElementById('settleModalDesc').textContent = cfg.desc;
+      document.getElementById('settleNameWrap').classList.toggle('hidden', !cfg.showName);
+      document.getElementById('settleNameInput').value = '';
+      document.getElementById('settleNameInput').required = cfg.showName;
+      document.getElementById('settleAmountInput').value = cfg.amount;
+      if (cfg.max != null) document.getElementById('settleAmountInput').max = cfg.max; else document.getElementById('settleAmountInput').removeAttribute('max');
+      document.getElementById('settleDateInput').value = cfg.date;
+      document.getElementById('settleFromCashWrap').classList.toggle('hidden', !cfg.showFromCash);
+      document.getElementById('settleFromCash').checked = cfg.fromCash !== false;
+      document.getElementById('settleSubmitBtn').textContent = cfg.submit;
+      document.getElementById('settleErrorText').classList.add('hidden');
+      document.getElementById('settleModalBackdrop').classList.remove('hidden');
+      setTimeout(() => document.getElementById(cfg.showName ? 'settleNameInput' : 'settleAmountInput').focus(), 30);
+    }
+
+    function closeSettleModal() {
+      settleCtx = null;
+      document.getElementById('settleModalBackdrop').classList.add('hidden');
+    }
+
+    function submitSettleForm(event) {
+      event.preventDefault();
+      if (!settleCtx) return;
+      const amount = parseFloat(document.getElementById('settleAmountInput').value);
+      const date = document.getElementById('settleDateInput').value;
+      const { mode, id } = settleCtx;
+      let res;
+      let msg = 'Saved';
+      let rain = null;
+      if (mode === 'settle') {
+        const r = FE.findRecord(state, id);
+        res = FE.settleRecord(state, id, { amount, date, fromCash: document.getElementById('settleFromCash').checked });
+        if (res.ok) { msg = r && r.kind === 'income' ? `Received +${formatMoney(res.tx.amount)}` : r && r.kind === 'savings' ? `Savings activated · ${formatMoney(res.tx.amount)}` : `Paid ${formatMoney(res.tx.amount)}`; rain = r && r.kind === 'income' ? 'in' : r && r.kind !== 'savings' ? 'out' : null; }
+      } else if (mode === 'debt') {
+        res = FE.recordDebtPayment(state, id, { amount, date });
+        if (res.ok) { msg = res.remaining > 0 ? `Paid ${formatMoney(res.tx.amount)} · ${formatMoney(res.remaining)} left` : 'Debt fully paid'; rain = 'out'; }
+      } else if (mode === 'budget') {
+        res = FE.recordBudgetSpend(state, id, { amount, date, name: document.getElementById('settleNameInput').value });
+        if (res.ok) { msg = `Spent ${formatMoney(res.tx.amount)}`; rain = 'out'; }
+      } else if (mode === 'daily') {
+        res = FE.receiveDailyEarning(state, id, { amount, date, time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) });
+        if (res.ok) { msg = `Received +${formatMoney(res.entry.amount)}`; rain = 'in'; }
+      }
+      if (!res || !res.ok) {
+        const err = res && res.error ? res.error.replace(/(\d+(?:\.\d+)?)(?= is left| left)/, n => formatMoney(Number(n))) : 'Could not save.';
+        showModalError('settleErrorText', err);
+        return;
+      }
+      saveState();
+      const btn = document.getElementById('settleSubmitBtn');
+      closeSettleModal();
+      renderAll();
+      const moved = res.tx || res.entry;
+      if (rain && moved) celebrateMoney(rain, moved.amount);
+      showToast(msg);
+    }
+
+    function openProfileGoalModal() {
+      document.getElementById('profileNameInput').value = state.userName || 'Alex';
+      document.getElementById('profileGoalTargetInput').value = state.monthlyGoalTarget || 1000;
+      document.getElementById('profileOpeningInput').value = Number(state.openingBalance) || 0;
+      document.getElementById('profileGoalModalBackdrop').classList.remove('hidden');
+    }
+
+    function closeProfileGoalModal() {
+      document.getElementById('profileGoalModalBackdrop').classList.add('hidden');
+    }
+
+    function saveProfileGoalForm(event) {
+      event.preventDefault();
+      state.userName = document.getElementById('profileNameInput').value.trim() || 'Alex';
+      state.monthlyGoalTarget = Math.max(100, parseFloat(document.getElementById('profileGoalTargetInput').value) || 1000);
+      state.openingBalance = FE.round2(parseFloat(document.getElementById('profileOpeningInput').value) || 0);
+      saveState();
+      closeProfileGoalModal();
+      renderAll();
+      showToast('Profile & plan updated');
+    }
+
+    // =========================================================================
+    // SETTINGS DROPDOWN, EXPORT/IMPORT, SAMPLE & INLINE RESET
+    // =========================================================================
+
+    function toggleSettingsMenu() {
+      document.getElementById('settingsDropdownMenu').classList.toggle('hidden');
+      toggleInlineClearConfirm(false);
+    }
+
+    function toggleAnalyticsMetricMenu() {
+      document.getElementById('analyticsMetricMenu').classList.toggle('hidden');
+    }
+
+    function toggleInlineClearConfirm(show) {
+      document.getElementById('clearZeroMenuDefault').classList.toggle('hidden', show);
+      document.getElementById('clearZeroMenuConfirm').classList.toggle('hidden', !show);
+    }
+
+    function loadSampleDataset() {
+      backupRaw(JSON.stringify(state), 'before-sample');
+      const curr = state.currency;
+      const sample = createSampleState();
+      if (curr !== sample.currency) FE.convertMoney(sample, v => convertAmount(v, sample.currency, curr));
+      sample.currency = curr;
+      state = finalizeLoadedState(sample);
+      saveState();
+      renderAll();
+      showToast('Sample data restored (previous data backed up)');
+    }
+
+    function executeClearAllToZero() {
+      backupRaw(JSON.stringify(state), 'before-clear');
+      state = finalizeLoadedState(createZeroState(state.currency, state.userName));
+      saveState();
+      renderAll();
+      showToast('All data cleared (a backup was kept)');
+    }
+
+    function downloadJSON(text, filename) {
+      const blob = new Blob([text], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+
+    function exportBackupJSON() {
+      downloadJSON(JSON.stringify(state, null, 2), `pay-finance-${state.activeMonth}.json`);
+      showToast('Backup exported');
+    }
+
+    function downloadSafetyBackup() {
+      const keys = listBackups();
+      if (!keys.length) { showToast('No safety backup yet'); return; }
+      const key = keys[keys.length - 1];
+      let text = localStorage.getItem(key) || '{}';
+      try { text = JSON.stringify(JSON.parse(text), null, 2); } catch (e) {}
+      downloadJSON(text, `${key.replace(/^payflow_/, 'pay-')}.json`);
+      showToast('Safety backup downloaded');
+    }
+
+    function triggerImportBackup() {
+      document.getElementById('importBackupInput').click();
+    }
+
+    function handleImportBackupFile(input) {
+      const file = input.files && input.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        let parsed;
+        try { parsed = JSON.parse(String(reader.result)); } catch (e) { showToast('That file is not a valid backup'); input.value = ''; return; }
+        const res = FE.normalizeState(parsed, { today: TODAY_DATE_STR });
+        if (!res) { showToast('That file is not a valid backup'); input.value = ''; return; }
+        backupRaw(JSON.stringify(state), 'before-import');
+        state = finalizeLoadedState(res.state);
+        saveState();
+        input.value = '';
+        renderAll();
+        showToast(res.migrated ? 'Backup imported and upgraded' : 'Backup imported');
+      };
+      reader.readAsText(file);
+    }
+
+    function toggleNotifMenu() {
+      document.getElementById('notifMenu').classList.toggle('hidden');
+    }
+
+    function renderNotifications() {
+      const list = document.getElementById('notifList');
+      if (!list) return;
+      const m = metricsFor(state.activeMonth);
+      const target = Number(state.monthlyGoalTarget) || 0;
+      const gp = FE.goalProgress(m.savingsAssets, target);
+      const pct = gp.pct;
+      const ic = d => `<div class="w-8 h-8 rounded-xl bg-shell text-obsidian flex items-center justify-center shrink-0"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${d}</svg></div>`;
+      const items = [];
+      const review = state.records.filter(r => r.needsReview);
+      if (review.length) items.push({ i: '<path d="M12 9v4"/><path d="M12 17h.01"/><circle cx="12" cy="12" r="9"/>', t: `${review.length} entr${review.length === 1 ? 'y' : 'ies'} to check`, d: `Carried over from the old version: ${review.slice(0, 3).map(x => escapeHTML(x.name)).join(', ')}. Open and save each to confirm.`, alert: true });
+      items.push({ i: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/>', t: 'Savings goal', d: `${formatMoney(m.savingsAssets)} of ${formatMoney(target)} · ${gp.label}`, bar: pct, alert: false });
+      if (m.liabilities > 0) items.push({ i: '<path d="M5 2v20l2.33-1.5L9.67 22 12 20.5 14.33 22l2.34-1.5L19 22V2l-2.33 1.5L14.33 2 12 3.5 9.67 2 7.33 3.5z"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="9" y1="12" x2="15" y2="12"/>', t: 'Outstanding debt', d: `${formatMoney(m.liabilities)} left across ${m.openDebts.length} debt${m.openDebts.length === 1 ? '' : 's'}`, alert: false });
+      const open = FE.cashFlowRecords(state, state.activeMonth).filter(x => FE.simpleStatus(state, x) === 'Pending');
+      if (open.length) items.push({ i: '<circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/>', t: `${open.length} pending item${open.length === 1 ? '' : 's'}`, d: open.slice(0, 3).map(x => escapeHTML(x.name)).join(', '), alert: true });
+      const over = m.budgets.filter(b => b.remaining < 0);
+      if (over.length) items.push({ i: '<polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/>', t: 'Over budget', d: over.map(b => `${escapeHTML(b.budget.name)} by ${formatMoney(-b.remaining)}`).join(', '), alert: true });
+      if (m.expectedCash < 0) items.push({ i: '<polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/>', t: 'Forecast below zero', d: `By month end you would be at ${formatMoney(m.expectedCash)}`, alert: true });
+      const todayAmt = FE.dailySummary(state, TODAY_DATE_STR).day;
+      items.push({ i: '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>', t: "Today's earning", d: todayAmt > 0 ? `+${formatMoney(todayAmt)} received` : 'Nothing received yet today', alert: false });
+      list.innerHTML = items.map(x => `<div class="px-4 py-3 flex gap-3 items-start border-b border-shell last:border-0">${ic(x.i)}<div class="min-w-0 flex-1"><div class="text-[13px] font-bold text-obsidian flex items-center gap-1.5">${x.t}${x.alert ? '<span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>' : ''}</div><div class="text-[12px] text-muted mt-0.5 tabular-nums">${x.d}</div>${x.bar !== undefined ? `<div class="h-1.5 bg-shell rounded-full mt-2 overflow-hidden"><div class="h-full bg-obsidian rounded-full" style="width:${x.bar}%"></div></div>` : ''}</div></div>`).join('');
+      document.getElementById('notifDot').classList.toggle('hidden', !items.some(x => x.alert));
+    }
+    // ---- Money effects: falling notes & coins + a cash sound -------------------
+    // direction 'in' = money received (cha-ching), 'out' = money paid (coin drop).
+    let audioCtx = null;
+    function moneySoundOn() { return state.soundOn !== false; }
+
+    function toggleSoundEffects() {
+      state.soundOn = !moneySoundOn();
+      saveState();
+      renderSoundToggle();
+      if (state.soundOn) playMoneySound('in');
+      showToast(state.soundOn ? 'Money sounds on' : 'Money sounds off');
+    }
+
+    function renderSoundToggle() {
+      const el = document.getElementById('soundToggleLabel');
+      if (el) el.textContent = `Money Sounds: ${moneySoundOn() ? 'On' : 'Off'}`;
+    }
+
+    function playMoneySound(direction) {
+      if (!moneySoundOn()) return;
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      try {
+        audioCtx = audioCtx || new AC();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const ctx = audioCtx;
+        const t0 = ctx.currentTime + 0.02;
+        const master = ctx.createGain();
+        master.gain.value = 0.32;
+        master.connect(ctx.destination);
+
+        // Metallic "ting": a sine plus an inharmonic partial, fast attack, exponential decay.
+        const bell = (freq, at, dur, vol) => {
+          [[1, 1], [2.76, 0.35], [5.4, 0.12]].forEach(([mult, part]) => {
+            const o = ctx.createOscillator();
+            const g = ctx.createGain();
+            o.type = 'sine';
+            o.frequency.value = freq * mult;
+            g.gain.setValueAtTime(0.0001, at);
+            g.gain.exponentialRampToValueAtTime(vol * part, at + 0.006);
+            g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+            o.connect(g); g.connect(master);
+            o.start(at); o.stop(at + dur + 0.05);
+          });
+        };
+        // Short filtered noise: the drawer "ka" / coin rattle.
+        const noise = (at, dur, vol, freq) => {
+          const len = Math.max(1, Math.floor(ctx.sampleRate * dur));
+          const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+          const data = buf.getChannelData(0);
+          for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / len);
+          const src = ctx.createBufferSource();
+          const f = ctx.createBiquadFilter();
+          const g = ctx.createGain();
+          src.buffer = buf;
+          f.type = 'bandpass'; f.frequency.value = freq; f.Q.value = 0.9;
+          g.gain.value = vol;
+          src.connect(f); f.connect(g); g.connect(master);
+          src.start(at);
+        };
+
+        if (direction === 'in') {
+          // Cash register: ka-CHING + a few coins settling.
+          noise(t0, 0.05, 0.9, 1800);
+          noise(t0 + 0.06, 0.04, 0.7, 2600);
+          bell(2093, t0 + 0.1, 1.1, 0.5);   // C7
+          bell(2637, t0 + 0.1, 1.1, 0.38);  // E7
+          bell(3136, t0 + 0.17, 0.9, 0.3);  // G7
+          for (let i = 0; i < 6; i++) bell(3800 + Math.random() * 2200, t0 + 0.32 + i * 0.07 + Math.random() * 0.03, 0.16, 0.12);
+        } else {
+          // Coins dropping out of the wallet: quick clinks, slightly falling in pitch.
+          for (let i = 0; i < 8; i++) {
+            const at = t0 + i * 0.065 + Math.random() * 0.03;
+            bell(4200 - i * 180 + Math.random() * 600, at, 0.2, 0.2);
+            noise(at, 0.02, 0.25, 5000);
+          }
+        }
+      } catch (e) { /* sound is optional */ }
+    }
+
+    function celebrateMoney(direction, amount) {
+      playMoneySound(direction);
+      const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (reduceMotion) return;
+      const sym = currencySymbol();
+      const W = window.innerWidth, H = window.innerHeight;
+      const count = direction === 'in' ? 42 : 26;
+      for (let i = 0; i < count; i++) {
+        const el = document.createElement('div');
+        const isNote = direction === 'in' ? Math.random() < 0.6 : Math.random() < 0.3;
+        el.className = isNote ? 'money-note' : 'money-coin';
+        if (isNote) el.innerHTML = `<span>${escapeHTML(sym)}</span>`;
+        const size = isNote ? 1 : 0.7 + Math.random() * 0.6;
+        const x = Math.random() * W;
+        el.style.left = `${x}px`;
+        el.style.top = '-60px';
+        document.body.appendChild(el);
+        const sway = (Math.random() - 0.5) * 160;
+        const spin = (Math.random() - 0.5) * (isNote ? 540 : 900);
+        const dist = H + 120;
+        const anim = el.animate([
+          { transform: `translate(0,0) rotate(0deg) scale(${size})`, opacity: 0 },
+          { transform: `translate(${sway * 0.4}px,${dist * 0.12}px) rotate(${spin * 0.15}deg) scale(${size})`, opacity: 1, offset: 0.08 },
+          { transform: `translate(${-sway * 0.5}px,${dist * 0.45}px) rotate(${spin * 0.5}deg) scale(${size})`, opacity: 1, offset: 0.5 },
+          { transform: `translate(${sway}px,${dist}px) rotate(${spin}deg) scale(${size})`, opacity: 0.85 }
+        ], {
+          duration: (isNote ? 2300 : 1600) + Math.random() * 1200,
+          delay: Math.random() * 600,
+          easing: isNote ? 'cubic-bezier(.3,.1,.6,1)' : 'cubic-bezier(.45,0,.9,.6)',
+          fill: 'backwards'
+        });
+        anim.onfinish = () => el.remove();
+      }
+      if (amount) {
+        const tag = document.createElement('div');
+        tag.className = `money-amount ${direction === 'in' ? 'money-amount-in' : 'money-amount-out'}`;
+        tag.textContent = `${direction === 'in' ? '+' : '−'}${formatMoney(amount)}`;
+        document.body.appendChild(tag);
+        tag.animate([
+          { transform: 'translate(-50%, 20px) scale(.7)', opacity: 0 },
+          { transform: 'translate(-50%, 0) scale(1.08)', opacity: 1, offset: 0.18 },
+          { transform: 'translate(-50%, -10px) scale(1)', opacity: 1, offset: 0.7 },
+          { transform: 'translate(-50%, -50px) scale(.96)', opacity: 0 }
+        ], { duration: 1900, easing: 'cubic-bezier(.2,.8,.2,1)' }).onfinish = () => tag.remove();
+      }
+    }
+
+    let toastTimer = null;
+    function showToast(msg) {
+      const el = document.getElementById('payToast');
+      document.getElementById('payToastText').textContent = msg;
+      el.classList.remove('translate-y-16', 'opacity-0');
+      el.classList.add('translate-y-0', 'opacity-100');
+
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        el.classList.add('translate-y-16', 'opacity-0');
+        el.classList.remove('translate-y-0', 'opacity-100');
+      }, 2200);
+    }
+
+    // Dismiss floating popovers/dropdowns on outside click
+    document.addEventListener('click', e => {
+      const popover = document.getElementById('rowActionPopover');
+      if (popover && !popover.contains(e.target)) {
+        closeRowPopover();
+      }
+
+      const nWrap = document.getElementById('settingsDropdownWrap');
+      const nMenu = document.getElementById('notifMenu');
+      if (nWrap && nMenu && !nWrap.contains(e.target)) nMenu.classList.add('hidden');
+      const settingsWrap = document.getElementById('profileDropdownWrap');
+      const settingsMenu = document.getElementById('settingsDropdownMenu');
+      if (settingsWrap && settingsMenu && !settingsWrap.contains(e.target)) {
+        settingsMenu.classList.add('hidden');
+      }
+
+      const metricWrap = document.getElementById('analyticsMetricDropdownWrap');
+      const metricMenu = document.getElementById('analyticsMetricMenu');
+      if (metricWrap && metricMenu && !metricWrap.contains(e.target)) {
+        metricMenu.classList.add('hidden');
+      }
+    });
+
+    window.addEventListener('DOMContentLoaded', () => {
+      renderAll();
+      if (startupNotice) setTimeout(() => showToast(startupNotice), 400);
+    });
+  </script>
+</body>
+</html>
